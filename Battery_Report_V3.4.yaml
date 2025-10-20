@@ -2,7 +2,7 @@ blueprint:
   name: 🪫 Отчет по состоянию батарей (v4.3 - Испр. отступы/Дни для Полного Отчета)
   description: Создает два кратких отчета. Добавлена опция включения Полного отчета (все батареи с типом/кол-вом) и выбор дней для него. Использует MarkdownV2 с полным экранированием.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/Battery_Report_V4.3.yaml
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4.yaml
   
   input:
     # 1. ТРИГГЕРЫ

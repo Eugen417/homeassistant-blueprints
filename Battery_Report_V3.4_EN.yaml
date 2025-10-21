@@ -1,5 +1,5 @@
 blueprint:
-  name: 🪫 Battery Status Report (v4.4 - Order & Stop Fixed)
+  name: 🪫 Battery Status Report (v4.4)
   description: |
     Generates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the type and quantity of power elements. 

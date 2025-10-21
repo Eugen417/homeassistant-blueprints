@@ -1,0 +1,353 @@
+blueprint:
+  name: 🪫 Battery Status Report (v4.3 - Fix indents/Days for Full Report)
+  description: >-
+    Generates two brief reports. Added an option to include a Full Report (all batteries
+    with type/quantity) and select days for it. Uses MarkdownV2 with full escaping.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/EN_Battery_Report_V3.4.yaml
+
+  input:
+    # 1. TRIGGERS
+    trigger_time:
+      name: Trigger Time
+      description: Time for the daily check (e.g., 08:00:00).
+      selector:
+        time:
+    trigger_days:
+      name: Days of the Week for Check (BRIEF REPORT)
+      description: Select the days when the BRIEF report should run (optional). If no days are selected, it runs every day.
+      default: []
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Monday
+              value: Mon
+            - label: Tuesday
+              value: Tue
+            - label: Wednesday
+              value: Wed
+            - label: Thursday
+              value: Thu
+            - label: Friday
+              value: Fri
+            - label: Saturday
+              value: Sat
+            - label: Sunday
+              value: Sun
+
+    # 2. DEVICES AND THRESHOLDS
+    
+    mobile_notify_target:
+      name: Mobile Device (Home Assistant App)
+      description: Select ONE device for push notifications. Leave empty if not needed.
+      default: ""
+      selector:
+        device:
+          integration: mobile_app
+
+    telegram_notify_target:
+      name: Telegram Notify Service
+      description: Select your Telegram service entity (notify.telegram_bot_...).
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    send_full_report_option:
+      name: Send Full Report as a second message (Telegram)?
+      description: Enable to receive a complete list of all batteries.
+      default: false
+      selector:
+        boolean:
+
+    full_report_days:
+      name: Days of the Week for FULL REPORT (Telegram)
+      description: Select the days when the full report should be sent if the option is enabled. Leave empty to send every day.
+      default: []
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Monday
+              value: Mon
+            - label: Tuesday
+              value: Tue
+            - label: Wednesday
+              value: Wed
+            - label: Thursday
+              value: Thu
+            - label: Friday
+              value: Fri
+            - label: Saturday
+              value: Sat
+            - label: Sunday
+              value: Sun
+    
+    critical_level:
+      name: Critical Level (%)
+      description: The charge level below which a device is marked as requiring CHARGING/REPLACEMENT. Default is 15%.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 99
+          step: 1
+          unit_of_measurement: "%"
+          mode: box
+          
+    excluded_sensors:
+      name: Excluded Sensors ("Battery+")
+      description: Charge level sensors to exclude from the report. Select those marked as "Battery+".
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: sensor
+              device_class: battery
+
+variables:
+  mobile_device_id: !input mobile_notify_target
+  telegram_target_id: !input telegram_notify_target 
+  critical_threshold: !input critical_level
+  excluded_entity_ids: !input excluded_sensors
+  send_full_report: !input send_full_report_option
+  full_report_days: !input full_report_days 
+
+trigger:
+  - platform: time
+    at: !input trigger_time
+
+condition:
+  - alias: Check for Day of the Week (BRIEF REPORT)
+    condition: template
+    value_template: >
+      {% set selected_days = trigger_days %}
+      {% if selected_days | length > 0 %}
+        {{ now().strftime('%a') in selected_days }}
+      {% else %}
+        {{ true }}
+      {% endif %}
+
+action:
+  # ----------------------------------------------------------------------
+  # 0. CALCULATE AND FORMAT MESSAGES (BRIEF AND FULL)
+  # ----------------------------------------------------------------------
+  - alias: Calculate Messages
+    variables:
+      threshold: "{{ critical_threshold | int }}"
+      exclude_list: "{{ excluded_entity_ids.entity_id | default([]) }}"
+      
+      # Message for disposable batteries (Replacement) - BRIEF REPORT 1
+      disposable_message: >-
+        {% set ns = namespace(disposable_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            {% if numerical_level >= 0 and numerical_level < threshold %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {# Remove " Battery+" from the sensor name #}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {% if not is_rechargeable %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
+                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ❌ REPLACEMENT! (Type: " ~ battery_type ~ ", Qty: " ~ battery_quantity ~ ")" %}
+                {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %}
+        {% set disposable_output = sorted_disposable | map(attribute='line') | list %}
+        {% if disposable_output | length > 0 %}
+          {{ "⚠ Devices requiring battery replacement:\n" ~ disposable_output | join('\n') }}
+        {% else %}
+          ✅ All non-rechargeable batteries are above {{ critical_threshold }}%.
+        {% endif %}
+
+      # Message for rechargeable devices (Charging) - BRIEF REPORT 2
+      rechargeable_message: >-
+        {% set ns = namespace(rechargeable_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            {% if numerical_level >= 0 and numerical_level < threshold %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {# Remove " Battery+" from the sensor name #}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {% if is_rechargeable %}
+                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 CHARGING!" %}
+                {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %}
+        {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %}
+        {% if rechargeable_output | length > 0 %}
+          {{ "⚠ Devices requiring battery charging:\n" ~ rechargeable_output | join('\n') }}
+        {% else %}
+          ✅ All rechargeable devices are above {{ critical_threshold }}%.
+        {% endif %}
+        
+      # REPORT 3: FULL LIST OF ALL BATTERIES (MESSAGE BODY WITH DETAILS)
+      full_report_body_list: >-
+        {% set ns = namespace(all_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            
+            {% if numerical_level >= 0 %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              
+              {% if numerical_level < threshold %}
+                {% set status_icon = '🔴' %}
+                {% set status_label = '❌ REPLACEMENT!' if not is_rechargeable else '🔌 CHARGING!' %}
+              {% else %}
+                {% set status_icon = '🟢' %}
+                {% set status_label = '' %} 
+              {% endif %}
+              
+              {# ADDING DETAILS ONLY FOR NON-RECHARGEABLE #}
+              {% set details = "" %}
+              {% if not is_rechargeable %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
+                {% set details = " (Type: " ~ battery_type ~ ", Qty: " ~ battery_quantity ~ ")" %}
+              {% endif %}
+
+              {% set line = status_icon ~ " " ~ cleaned_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
+              {% set ns.all_lines = ns.all_lines + [{ 'level': numerical_level, 'line': line }] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_all = ns.all_lines | sort(attribute='level', reverse=true) %}
+        {% set all_output = sorted_all | map(attribute='line') | list %}
+        
+        {% if all_output | length > 0 %}
+          {{ all_output | join('\n') }}
+        {% else %}
+          No battery sensors found.
+        {% endif %}
+
+
+  # ----------------------------------------------------------------------
+  # 1. SEND REPORT 1: DISPOSABLE (REPLACEMENT)
+  # ----------------------------------------------------------------------
+  
+  # 1.1 Mobile App
+  - alias: Mobile App - Disposable Report (Conditional)
+    choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
+        sequence:
+          - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+            data:
+              title: "🪫 REQUIRES REPLACEMENT: Batteries, charge < {{ critical_threshold }}%"
+              message: "{{ disposable_message }}"
+
+  # 1.2 Telegram Bot Service (MarkdownV2)
+  - alias: Telegram - Disposable Report (Conditional)
+    choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ telegram_target_id.entity_id | length > 0 }}"
+        sequence:
+          - service: telegram_bot.send_message
+            data:
+              chat_id: >-
+                {% set entity_id = telegram_target_id.entity_id[0] %}
+                {% set parts = entity_id.split('_') %}
+                {{ parts[-1] }}
+              message: |
+                {% set report_body = disposable_message %}
+                {% set header = "🪫 REQUIRES REPLACEMENT: Batteries, charge < " ~ critical_threshold ~ "%" %}
+                
+                {# Full escaping of MarkdownV2 special characters #}
+                {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                {{ header ~ "\n\n" ~ escaped_body }}
+              parse_mode: markdownv2
+      
+  # ----------------------------------------------------------------------
+  # 2. SEND REPORT 2: RECHARGEABLE (CHARGING)
+  # ----------------------------------------------------------------------
+
+  # 2.1 Mobile App
+  - alias: Mobile App - Rechargeable Report (Conditional)
+    choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
+        sequence:
+          - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+            data:
+              title: "🔌 REQUIRES CHARGING: Charge < {{ critical_threshold }}%"
+              message: "{{ rechargeable_message }}"
+  
+  # 2.2 Telegram Bot Service (MarkdownV2)
+  - alias: Telegram - Rechargeable Report (Conditional)
+    choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ telegram_target_id.entity_id | length > 0 }}"
+        sequence:
+          - service: telegram_bot.send_message
+            data:
+              chat_id: >-
+                {% set entity_id = telegram_target_id.entity_id[0] %}
+                {% set parts = entity_id.split('_') %}
+                {{ parts[-1] }}
+              message: |
+                {% set report_body = rechargeable_message %}
+                {% set header = "🔌 REQUIRES CHARGING: Charge < " ~ critical_threshold ~ "%" %}
+
+                {# Full escaping of MarkdownV2 special characters #}
+                {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                {{ header ~ "\n\n" ~ escaped_body }}
+              parse_mode: markdownv2
+
+  # ----------------------------------------------------------------------
+  # 3. SEND REPORT 3: FULL LIST (OPTIONAL)
+  # ----------------------------------------------------------------------
+  - alias: Telegram - Send Full Report (Conditional)
+    choose:
+      - conditions:
+          # CORRECTED: This is now a list of two separate conditions
+          - condition: template
+            value_template: "{{ telegram_target_id.entity_id | length > 0 and send_full_report }}"
+          - condition: template
+            value_template: >
+              {% set selected_days = full_report_days %}
+              {% if selected_days | length > 0 %}
+                {{ now().strftime('%a') in selected_days }}
+              {% else %}
+                {{ true }}
+              {% endif %}
+        sequence:
+          - variables:
+              # Title for the Full Report (with full escaping)
+              full_report_title: "🔋 Full Report on All Batteries:"
+              full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list }}"
+              
+          - service: telegram_bot.send_message
+            data:
+              chat_id: >-
+                {% set entity_id = telegram_target_id.entity_id[0] %}
+                {% set parts = entity_id.split('_') %}
+                {{ parts[-1] }}
+              message: |
+                {% set report_body = full_report_message %}
+                {# Full escaping of MarkdownV2 special characters #}
+                {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                {{ escaped_body }}
+              parse_mode: markdownv2
+mode: single

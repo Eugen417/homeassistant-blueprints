@@ -4,7 +4,6 @@ blueprint:
     Generates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the type and quantity of power elements. 
     Optionally (Telegram only), a full status report of all batteries can be sent and **indicating the total battery count by type.**
-    Optionally (Telegram only), a full status report of all batteries can be sent.
     
     **Important Requirement!** The **HA-Battery Notes** integration must be installed and configured beforehand for the automation to work.
   domain: automation

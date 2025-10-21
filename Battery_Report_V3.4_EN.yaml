@@ -1,9 +1,9 @@
 blueprint:
-  name: 🪫 Battery Status Report (v4.3 - Order & Stop Fixed)
+  name: 🪫 Battery Status Report (v4.4)
   description: |
     Generates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the type and quantity of power elements. 
-    Optionally (Telegram only), a full status report of all batteries can be sent.
+    Optionally (Telegram only), a full status report of all batteries can be sent and **indicating the total battery count by type.**
     
     **Important Requirement!** The **HA-Battery Notes** integration must be installed and configured beforehand for the automation to work.
   domain: automation
@@ -102,8 +102,8 @@ blueprint:
           mode: box
           
     excluded_sensors:
-      name: Excluded Sensors ("Battery+")
-      description: Charge level sensors to exclude from the report. Select those marked as "Battery+".
+      name: Excluded Sensors ("Батарея+")
+      description: Charge level sensors to exclude from the report. Select those marked as "Батарея+".
       default:
         entity_id: []
       selector:
@@ -144,8 +144,8 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Battery+" from sensor name #}
-              {% set cleaned_name = name | replace(' Battery+', '') | trim %} 
+              {# Remove " Батарея+" from sensor name #}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
@@ -172,8 +172,8 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Battery+" from sensor name #}
-              {% set cleaned_name = name | replace(' Battery+', '') | trim %}
+              {# Remove " Батарея+" from sensor name #}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if is_rechargeable %}
                 {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 RECHARGE!" %}
@@ -200,7 +200,7 @@ action:
             
             {% if numerical_level >= 0 %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {% set cleaned_name = name | replace(' Battery+', '') | trim %} 
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               
               {% if numerical_level < threshold %}
@@ -230,6 +230,37 @@ action:
           {{ all_output | join('\n') }}
         {% else %}
           No battery sensors found.
+        {% endif %}
+        
+      # REPORT 4: SUMMARY BY BATTERY TYPE (Total Quantity of Cells)
+      battery_types_summary: >-
+        {% set ns = namespace(output_lines=[]) %}
+        {% set all_battery_sensors = states.sensor 
+            | selectattr('attributes.battery_last_reported_level', 'defined') 
+            | rejectattr('entity_id', 'in', exclude_list) 
+            | list %}
+            
+        {% set grouped_by_type = all_battery_sensors 
+            | groupby('attributes.battery_type') %}
+            
+        {% for type, sensors in grouped_by_type %}
+          {% set total_quantity = namespace(value=0) %}
+          {% for sensor in sensors %}
+            {# Safely extract and convert battery_quantity, default to 1 if not present #}
+            {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %}
+            {% set total_quantity.value = total_quantity.value + quantity %}
+          {% endfor %}
+
+          {# Formatted line: • [Type] (Total: [Count] pcs) #}
+          {% set display_type = type | default('Unknown Type') | string %}
+          {% set line = "• " ~ display_type ~ " (Total: " ~ total_quantity.value ~ " pcs)" %}
+          {% set ns.output_lines = ns.output_lines + [line] %}
+        {% endfor %}
+        
+        {% if ns.output_lines | length > 0 %}
+          {{ "--- \n\n🔋 Summary by Battery Type (Total Quantity of Cells):\n" ~ ns.output_lines | sort | join('\n') }}
+        {% else %}
+          No battery type data available for reporting.
         {% endif %}
 
   # ----------------------------------------------------------------------
@@ -355,8 +386,9 @@ action:
         sequence:
           - variables:
               # Header for Full Report (with full escaping)
-              full_report_title: "🔋 Full Report on All Batteries:"
-              full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list }}"
+              full_report_title: "🔋 Full Report on All Batteries (Sorted by Level):"
+              # Appending the new battery_types_summary to the message
+              full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
               
           - service: telegram_bot.send_message
             data:

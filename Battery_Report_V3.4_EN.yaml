@@ -1,9 +1,10 @@
 blueprint:
-  name: 🪫 Battery Status Report (v4.4)
+  name: 🪫 Battery Status Report (v4.3 - Order & Stop Fixed)
   description: |
     Generates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the type and quantity of power elements. 
     Optionally (Telegram only), a full status report of all batteries can be sent and **indicating the total battery count by type.**
+    Optionally (Telegram only), a full status report of all batteries can be sent.
     
     **Important Requirement!** The **HA-Battery Notes** integration must be installed and configured beforehand for the automation to work.
   domain: automation
@@ -102,8 +103,8 @@ blueprint:
           mode: box
           
     excluded_sensors:
-      name: Excluded Sensors ("Батарея+")
-      description: Charge level sensors to exclude from the report. Select those marked as "Батарея+".
+      name: Excluded Sensors ("Battery+")
+      description: Charge level sensors to exclude from the report. Select those marked as "Battery+".
       default:
         entity_id: []
       selector:
@@ -144,8 +145,8 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Батарея+" from sensor name #}
-              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {# Remove " Battery+" from sensor name #}
+              {% set cleaned_name = name | replace(' Battery+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
@@ -172,8 +173,8 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Батарея+" from sensor name #}
-              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {# Remove " Battery+" from sensor name #}
+              {% set cleaned_name = name | replace(' Battery+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if is_rechargeable %}
                 {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 RECHARGE!" %}
@@ -200,7 +201,7 @@ action:
             
             {% if numerical_level >= 0 %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {% set cleaned_name = name | replace(' Battery+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               
               {% if numerical_level < threshold %}

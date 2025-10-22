@@ -193,6 +193,10 @@ action:
       # ОТЧЕТ 3: ПОЛНЫЙ СПИСОК ВСЕХ БАТАРЕЙ (ТЕЛО СООБЩЕНИЯ С ДЕТАЛЯМИ)
       full_report_body_list: >-
         {% set ns = namespace(all_lines=[]) %}
+        {# Фиксированные пороги для цветовых индикаторов в полном отчете (не зависят от critical_level) #}
+        {% set yellow_boundary = 40 %}
+        {% set red_boundary = 15 %}
+        
         {% for sensor in states.sensor %}
           {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
             {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
@@ -203,12 +207,18 @@ action:
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               
+              {# 1. ОПРЕДЕЛЕНИЕ ЦВЕТОВОГО СТАТУСА (На основе фиксированных порогов 15/40) #}
+              {% set status_icon = '🟢' %} 
+              {% if numerical_level < red_boundary %}
+                {% set status_icon = '🔴' %} 
+              {% elif numerical_level < yellow_boundary %}
+                {% set status_icon = '🟡' %} 
+              {% endif %}
+              
+              {# 2. ОПРЕДЕЛЕНИЕ ТЕКСТОВОЙ МЕТКИ АВАРИИ (На основе пользовательского critical_threshold) #}
+              {% set status_label = '' %}
               {% if numerical_level < threshold %}
-                {% set status_icon = '🔴' %}
-                {% set status_label = '❌ ЗАМЕНА!' if not is_rechargeable else '🔌 ЗАРЯДКА!' %}
-              {% else %}
-                {% set status_icon = '🟢' %}
-                {% set status_label = '' %} 
+                {% set status_label = ' ❌ ЗАМЕНА!' if not is_rechargeable else ' 🔌 ЗАРЯДКА!' %}
               {% endif %}
               
               {# ДОБАВЛЕНИЕ ДЕТАЛЕЙ ТОЛЬКО ДЛЯ незаряжаемых #}

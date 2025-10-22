@@ -1,5 +1,5 @@
 blueprint:
-  name: 🪫 Battery Status Report (v4.4)
+  name: 🪫 Battery Status Report (v4.5)
   description: |
     Generates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the type and quantity of power elements. 
@@ -193,6 +193,10 @@ action:
       # REPORT 3: FULL LIST OF ALL BATTERIES (MESSAGE BODY WITH DETAILS)
       full_report_body_list: >-
         {% set ns = namespace(all_lines=[]) %}
+        {# Fixed boundaries for color indicators in the full report (independent of critical_level) #}
+        {% set yellow_boundary = 40 %}
+        {% set red_boundary = 15 %}
+        
         {% for sensor in states.sensor %}
           {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
             {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
@@ -203,12 +207,18 @@ action:
               {% set cleaned_name = name | replace(' Battery+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               
+              {# 1. DETERMINE COLOR STATUS (Based on fixed 15/40 thresholds) #}
+              {% set status_icon = '🟢' %} 
+              {% if numerical_level < red_boundary %}
+                {% set status_icon = '🔴' %} 
+              {% elif numerical_level < yellow_boundary %}
+                {% set status_icon = '🟡' %} 
+              {% endif %}
+              
+              {# 2. DETERMINE TEXT ALERT LABEL (Based on user's critical_threshold) #}
+              {% set status_label = '' %}
               {% if numerical_level < threshold %}
-                {% set status_icon = '🔴' %}
-                {% set status_label = '❌ REPLACE!' if not is_rechargeable else '🔌 RECHARGE!' %}
-              {% else %}
-                {% set status_icon = '🟢' %}
-                {% set status_label = '' %} 
+                {% set status_label = ' ❌ REPLACE!' if not is_rechargeable else ' 🔌 RECHARGE!' %}
               {% endif %}
               
               {# ADDING DETAILS ONLY FOR non-rechargeable #}

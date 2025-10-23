@@ -1,0 +1,113 @@
+blueprint:
+  name: Автоматический перезапуск (Интеграция/Add-on) по доступности (v7 финальная)
+  description: >-
+    Проверяет доступность устройств по расписанию. Если хотя бы одно устройство 
+    'unavailable' или 'unknown', запускается перезагрузка выбранной Интеграции
+    или Add-on.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/restart_integration_if_device_state_unknown.yaml
+  
+  input:
+    entities_to_monitor:
+      name: Сущности для мониторинга (минимум 1)
+      description: Выберите одну или несколько сущностей. Их недоступность вызовет перезапуск.
+      selector:
+        entity:
+          multiple: true
+    target_type:
+      name: Тип цели
+      description: |
+        Выберите, что нужно перезагрузить:
+        - **integration (Интеграция):** Будет перезагружена конфигурационная запись.
+        - **addon (Add-on):** Будет перезапущен Add-on.
+      default: integration
+      selector:
+        select:
+          options:
+            - integration
+            - addon
+    target_id:
+      name: ID Цели
+      description: |
+        Укажите идентификатор: UUID конфигурации для Integration или Slug для Add-on.
+      selector:
+        text:
+    check_frequency:
+      name: Частота проверки (time_pattern)
+      description: Интервал проверки доступности в формате time_pattern (например, "/5" — каждые 5 минут).
+      default: "/5"
+      selector:
+        text:
+
+# -----------------------------------------------------------
+# ТРИГГЕР: Запуск по заданному временному шаблону.
+# -----------------------------------------------------------
+trigger:
+  - platform: time_pattern
+    minutes: !input check_frequency
+
+# -----------------------------------------------------------
+# ДЕЙСТВИЕ: Проверяем доступность И выполняем перезапуск.
+# -----------------------------------------------------------
+action:
+  # Шаг 1: Определяем ВСЕ переменные, включая входные данные, в одном блоке.
+  - variables:
+      monitor_entities: !input entities_to_monitor
+      target_id: !input target_id
+      target_type: !input target_type
+      
+      # ИСПРАВЛЕНИЕ #1: Использование namespace для корректного сбора списка внутри цикла.
+      offline_entities_processed: >
+        {% set ns = namespace(unavailable_ids=[]) %}
+        {% for entity_id in monitor_entities %}
+          {% set state = states(entity_id) %}
+          {# Проверяем, что состояние определено и является 'unavailable' или 'unknown' #}
+          {% if state is defined and state is not none and state in ['unavailable', 'unknown'] %}
+            {# Используем namespace для добавления ID в список, обновляя его в глобальной области видимости #}
+            {% set ns.unavailable_ids = ns.unavailable_ids + [entity_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.unavailable_ids }} # Возвращаем чистый список ID
+
+      # ИСПРАВЛЕНИЕ #2: Создаем чистую строку для уведомления.
+      unavailable_entities_string: "{{ offline_entities_processed | join(', ') }}"
+
+  # Шаг 2: Используем CHOOSE для проверки и выполнения действия ТОЛЬКО, 
+  # если есть недоступные сущности.
+  - choose:
+      - conditions:
+          - condition: template
+            # Проверяем количество элементов в чистом списке ID
+            value_template: "{{ offline_entities_processed | count > 0 }}"
+        sequence:
+          # 1. Вложенный CHOOSE для выбора типа перезапуска
+          - choose:
+              # ВАРИАНТ 1: ПЕРЕЗАГРУЗКА ИНТЕГРАЦИИ
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_type == 'integration' }}"
+                sequence:
+                  - service: homeassistant.reload_config_entry 
+                    data:
+                      entry_id: "{{ target_id }}" 
+              
+              # ВАРИАНТ 2: ПЕРЕЗАПУСК ADD-ON
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_type == 'addon' }}"
+                sequence:
+                  - service: hassio.addon_restart
+                    data:
+                      addon: "{{ target_id }}"
+            default: []
+
+          # 2. Уведомление о выполненном действии
+          - service: persistent_notification.create
+            data:
+              title: "Автоматический перезапуск Home Assistant"
+              message: >
+                **{{ target_type | upper }}** с ID **{{ target_id }}** был(а) перезагружен(а), так как следующие сущности стали недоступны ({{ now().strftime('%H:%M:%S') }}): 
+                **{{ unavailable_entities_string }}**.
+    
+    default: []
+mode: single

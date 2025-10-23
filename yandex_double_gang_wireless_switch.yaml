@@ -1,0 +1,232 @@
+blueprint:
+  name: Выключатель Yandex (на основе сущности-события)
+  description: >-
+    Автоматизация для управления устройствами с помощью беспроводного выключателя Yandex
+    (YNDX_00535), используя сущность-событие и атрибут event_type в качестве триггера.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/yandex_double_gang_wireless_switch.yaml
+
+  input:
+    yandex_switch_entity:
+      name: Сущность выключателя Yandex
+      description: >-
+        Выберите сущность, которая генерирует команды выключателя
+        (например, event.yandex_double_gang_wireless_switch_action).
+      selector:
+        entity:
+          domain: event
+          integration: mqtt
+
+    on_b1_up:
+      name: Правая кнопка — верх (длительное нажатие) (on_b1_up)
+      description: >-
+        Действие, которое выполняется при длительном нажатии (удержании) правой кнопки
+        вверх, например, для плавного увеличения яркости.
+      default: []
+      selector:
+        action: {}
+    on_b1_down:
+      name: Правая кнопка — вниз (отпускание при длительном нажатии) (on_b1_down)
+      description: >-
+        Действие, которое выполняется при отпускании правой кнопки после длительного
+        нажатия (удержания).
+      default: []
+      selector:
+        action: {}
+
+    off_b1_up:
+      name: Правая кнопка — верх (длительное нажатие) (off_b1_up)
+      description: >-
+        Действие, которое выполняется при длительном нажатии (удержании) правой кнопки
+        вверх, например, для плавного уменьшения яркости.
+      default: []
+      selector:
+        action: {}
+    off_b1_down:
+      name: Правая кнопка — вниз (отпускание при длительном нажатии) (off_b1_down)
+      description: >-
+        Действие, которое выполняется при отпускании правой кнопки после длительного
+        нажатия (удержания).
+      default: []
+      selector:
+        action: {}
+        
+    toggle_b1_up:
+      name: Правая кнопка — короткое нажатие вверх (toggle_b1_up)
+      description: >-
+        Действие, которое выполняется при коротком нажатии правой кнопки вверх.
+      default: []
+      selector:
+        action: {}
+    toggle_b1_down:
+      name: Правая кнопка — короткое нажатие вниз (toggle_b1_down)
+      description: >-
+        Действие, которое выполняется при коротком нажатии правой кнопки вниз.
+      default: []
+      selector:
+        action: {}
+
+    on_b2_up:
+      name: Левая кнопка — верх (длительное нажатие) (on_b2_up)
+      description: >-
+        Действие, которое выполняется при длительном нажатии (удержании) левой кнопки
+        вверх.
+      default: []
+      selector:
+        action: {}
+    on_b2_down:
+      name: Левая кнопка — вниз (отпускание при длительном нажатии) (on_b2_down)
+      description: >-
+        Действие, которое выполняется при отпускании левой кнопки после длительного
+        нажатия (удержания).
+      default: []
+      selector:
+        action: {}
+        
+    off_b2_up:
+      name: Левая кнопка — верх (длительное нажатие) (off_b2_up)
+      description: >-
+        Действие, которое выполняется при длительном нажатии (удержании) левой кнопки
+        вверх.
+      default: []
+      selector:
+        action: {}
+    off_b2_down:
+      name: Левая кнопка — вниз (отпускание при длительном нажатии) (off_b2_down)
+      description: >-
+        Действие, которое выполняется при отпускании левой кнопки после длительного
+        нажатия (удержания).
+      default: []
+      selector:
+        action: {}
+        
+    toggle_b2_up:
+      name: Левая кнопка — короткое нажатие вверх (toggle_b2_up)
+      description: >-
+        Действие, которое выполняется при коротком нажатии левой кнопки вверх.
+      default: []
+      selector:
+        action: {}
+    toggle_b2_down:
+      name: Левая кнопка — короткое нажатие вниз (toggle_b2_down)
+      description: >-
+        Действие, которое выполняется при коротком нажатии левой кнопки вниз.
+      default: []
+      selector:
+        action: {}
+        
+trigger:
+  - platform: state
+    entity_id: !input yandex_switch_entity
+    attribute: event_type
+    to:
+      - on_b1_up
+      - on_b1_down
+      - on_b2_up
+      - on_b2_down
+      - off_b1_up
+      - off_b1_down
+      - off_b2_up
+      - off_b2_down
+      - toggle_b1_up
+      - toggle_b1_down
+      - toggle_b2_up
+      - toggle_b2_down
+
+action:
+  - choose:
+      - conditions:
+          # ИСПРАВЛЕНИЕ: Игнорировать срабатывание, если сущность вышла из состояния "unavailable"
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'on_b1_up' }}"
+        sequence: !input on_b1_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'on_b1_down' }}"
+        sequence: !input on_b1_down
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'off_b1_up' }}"
+        sequence: !input off_b1_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'off_b1_down' }}"
+        sequence: !input off_b1_down
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'toggle_b1_up' }}"
+        sequence: !input toggle_b1_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'toggle_b1_down' }}"
+        sequence: !input toggle_b1_down
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'on_b2_up' }}"
+        sequence: !input on_b2_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'on_b2_down' }}"
+        sequence: !input on_b2_down
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'off_b2_up' }}"
+        sequence: !input off_b2_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'off_b2_down' }}"
+        sequence: !input off_b2_down
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'toggle_b2_up' }}"
+        sequence: !input toggle_b2_up
+
+      - conditions:
+          # ИСПРАВЛЕНИЕ
+          - condition: template
+            value_template: "{{ trigger.from_state.state != 'unavailable' }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.attributes.event_type == 'toggle_b2_down' }}"
+        sequence: !input toggle_b2_down

@@ -1,0 +1,288 @@
+blueprint:
+  name: 💨 Управление вентиляцией по CO2 v13.1 (Финальная версия)
+  description: >-
+    Упрощенная автоматизация, которая управляет вентилятором по CO2,
+    используя помощник `input_select` для отслеживания режима работы и
+    обнаружения внешнего вмешательства. Логика включения **блокируется**
+    если автоматизация не находится в режиме RUNNING (IDLE/свободно).
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_fan_speed_on-off.yaml
+  
+  input:
+    co2_sensors:
+      name: Датчики CO2
+      description: Выберите один или несколько датчиков CO2.
+      selector:
+        entity:
+          domain: sensor
+          device_class: carbon_dioxide
+          multiple: true
+    target_fan:
+      name: Целевой вентилятор
+      description: >-
+        Вентилятор, которым будет управлять автоматизация.
+        **Обязательно используйте сущность с доменном `fan` (например, `fan.gtc_fan`),**
+        который поддерживает установку скорости в процентах (`set_percentage`).
+      default: fan.gtc_fan
+      selector:
+        entity:
+          domain: fan
+    automation_mode_select:
+      name: Помощник Режима (Input Select)
+      description: >-
+        **Обязательный** помощник типа `input_select`. Используется для
+        отслеживания состояния:
+        * **RUNNING:** (IDLE/Свободно) Автоматизация выключена и готова к включению.
+        * **WAITING:** (ACTIVE/Блокировка) Автоматизация включена или была
+          выключена вручную при высоком CO2.
+        *Требуется настройка:* Создайте его с двумя опциями: **`RUNNING`** и **`WAITING`**.
+      selector:
+        entity:
+          domain: input_select
+    previous_co2_helper:
+      name: Помощник для предыдущего CO2
+      description: >-
+        **Обязательный** помощник типа `input_number`. Используется для
+        хранения последнего значения CO2 для логики гистерезиса.
+      selector:
+        entity:
+          domain: input_number
+    low_co2_max:
+      name: Нижний порог CO2 (макс, ppm)
+      description: >-
+        Максимальное значение CO2, при котором вентилятор должен либо
+        **выключиться**, либо работать на **минимальной скорости**.
+      default: 600
+      selector:
+        number:
+          min: 400
+          max: 1000
+          step: 1
+          mode: box
+          unit_of_measurement: "ppm"
+    max_speed:
+      name: Максимальная скорость вентилятора (%)
+      description: >-
+        Самая высокая скорость, до которой может разогнаться вентилятор
+        при высоком уровне CO2.
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 100
+          step: 10
+          mode: slider
+          unit_of_measurement: "%"
+    co2_increase_threshold:
+      name: Порог повышения CO2 для включения (ppm)
+      description: >-
+        Насколько CO2 должен превышать 'Нижний порог CO2 (макс, ppm)', чтобы
+        вентилятор включился (пороговое значение + этот порог).
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: box
+          unit_of_measurement: "ppm"
+    co2_change_threshold:
+      name: Порог изменения CO2 для скорости (ppm)
+      description: >-
+        Минимальная разница CO2, необходимая для **СНИЖЕНИЯ** скорости.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: box
+          unit_of_measurement: "ppm"
+    start_speed:
+      name: Минимальная/Стартовая Скорость (%)
+      description: >-
+        Если выбрано 0%, вентилятор будет ВЫКЛЮЧАТЬСЯ при низком CO2,
+        но стартовать будет всегда с 10%. Если >0%, вентилятор остается
+        ВКЛЮЧЕННЫМ на указанной минимальной скорости.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 10
+          mode: slider
+          unit_of_measurement: "%"
+    update_frequency:
+      name: Частота проверки (minutes)
+      description: Интервал проверки CO2 в формате time_pattern (например, "/5" для каждые 5 минут).
+      default: "/5"
+      selector:
+        text:
+mode: single
+trigger:
+  - platform: time_pattern
+    minutes: !input update_frequency
+action:
+  - variables:
+      co2_sensors_list: !input co2_sensors
+      target_fan_entity: !input target_fan
+      low_co2_max_val: !input low_co2_max
+      max_speed_val: !input max_speed
+      co2_increase_threshold_val: !input co2_increase_threshold
+      co2_change_threshold_val: !input co2_change_threshold
+      start_speed_val: !input start_speed
+      previous_co2_helper_entity_id: !input previous_co2_helper
+      mode_select_entity_id: !input automation_mode_select
+      
+      current_mode: "{{ states(mode_select_entity_id) }}"
+      is_fan_on: "{{ is_state(target_fan_entity, 'on') }}"
+
+      # Расчет минимальной скорости (для предотвращения полного выключения, если start_speed > 0)
+      min_fan_speed: >
+        {% if start_speed_val | float == 0 %}
+          10
+        {% else %}
+          {{ start_speed_val }}
+        {% endif %}
+
+      avg_co2: >
+        {% set valid_readings = co2_sensors_list
+          | map('states')
+          | map('float', 0)
+          | select('>', 0)
+          | list
+        %}
+        {% if valid_readings | length > 0 %}
+          {{ (valid_readings | sum / valid_readings | length) | round(1) }}
+        {% else %}
+          0
+        {% endif %}
+        
+      current_speed: >
+        {{ state_attr(target_fan_entity, 'percentage') | float(0) }}
+      previous_co2: "{{ states(previous_co2_helper_entity_id) | float(0) }}"
+
+  - choose:
+      # --- ЛОГИКА 1: ВКЛЮЧЕНИЕ ВЕНТИЛЯТОРА (С БЛОКИРОВКОЙ) ---
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_fan_on }}"
+          - condition: template
+            value_template: >
+              {{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}
+          - condition: template
+            value_template: "{{ current_mode == 'RUNNING' }}"
+        sequence:
+          - service: fan.turn_on
+            target:
+              entity_id: "{{ target_fan_entity }}"
+          - delay:
+              seconds: 50
+          - service: fan.set_percentage
+            target:
+              entity_id: "{{ target_fan_entity }}"
+            data:
+              # Используем min_fan_speed для установки стартовой скорости
+              percentage: "{{ min_fan_speed }}"
+          - service: input_select.select_option
+            target:
+              entity_id: "{{ mode_select_entity_id }}"
+            data:
+              option: WAITING
+#          - service: persistent_notification.create
+#            data:
+#              title: "CO2 Вентиляция: ВКЛЮЧЕНА"
+#              message: "CO2 ({{ avg_co2 }} ppm) выше порога. Режим Активен (WAITING)."
+              
+      # --- ЛОГИКА 2: ВЕНТИЛЯТОР ВКЛЮЧЕН (РЕГУЛИРОВКА СКОРОСТИ И ВЫКЛЮЧЕНИЕ) ---
+      - conditions:
+          - condition: template
+            value_template: "{{ is_fan_on }}"
+        sequence:
+          - choose:
+              # ВАРИАНТ 2.1: ВЫКЛЮЧЕНИЕ ИЛИ УСТАНОВКА МИНИМАЛЬНОЙ СКОРОСТИ (CO2 ниже порога)
+              - conditions:
+                  - condition: template
+                    value_template: |
+                      {{ avg_co2 < low_co2_max_val | float }}
+                sequence:
+#                  - service: persistent_notification.create
+#                    data:
+#                      title: "CO2 Вентиляция: НИЗКИЙ CO2"
+#                      message: "CO2 ({{ avg_co2 }} ppm) ниже порога. Переход в режим Ожидания (IDLE)."
+                  
+                  # --- ЛОГИКА ВЫКЛЮЧЕНИЯ/МИНИМАЛЬНОЙ СКОРОСТИ ---
+                  - if:
+                      # Если start_speed_val == 0 (полное выключение)
+                      - condition: template
+                        value_template: "{{ start_speed_val | float == 0 }}"
+                    then:
+                      # Штатное выключение: сначала ставим 10%, потом выключаем.
+                      - service: fan.set_percentage
+                        target:
+                          entity_id: "{{ target_fan_entity }}"
+                        data:
+                          percentage: 10
+                      - delay:
+                          seconds: 5
+                      - service: fan.turn_off
+                        target:
+                          entity_id: "{{ target_fan_entity }}"
+                      - service: input_select.select_option
+                        target:
+                          entity_id: "{{ mode_select_entity_id }}"
+                        data:
+                          option: RUNNING
+                    else:
+                      # Если start_speed_val > 0, устанавливаем минимальную скорость и не выключаем.
+                      - service: fan.set_percentage
+                        target:
+                          entity_id: "{{ target_fan_entity }}"
+                        data:
+                          percentage: "{{ start_speed_val }}"
+                  # --- КОНЕЦ ЛОГИКИ ---
+              
+              # ВАРИАНТ 2.2: СНИЖЕНИЕ СКОРОСТИ (Режим WAITING сохраняется)
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (previous_co2 - avg_co2) >= co2_change_threshold_val | float }}
+                sequence:
+                  - variables:
+                      # Используем min_fan_speed, определенный в основном блоке variables
+                      new_speed: >
+                        {{ [current_speed - 10, min_fan_speed] | max }}
+                  - service: fan.set_percentage
+                    target:
+                      entity_id: "{{ target_fan_entity }}"
+                    data:
+                      percentage: "{{ new_speed }}"
+#                  - service: persistent_notification.create
+#                    data:
+#                        title: "CO2 Вентиляция: СНИЖЕНИЕ СКОРОСТИ"
+#                        message: "CO2 снижается. Установка скорости {{ new_speed | int }}%."
+                      
+              # ВАРИАНТ 2.3: ПОВЫШЕНИЕ СКОРОСТИ (Режим WAITING сохраняется)
+              - conditions:
+                  - condition: template
+                    value_template: |
+                      {{ avg_co2 > previous_co2 }}
+                sequence:
+                  - variables:
+                      new_speed: >
+                        {{ [current_speed + 10, max_speed_val] | min }}
+                  - service: fan.set_percentage
+                    target:
+                      entity_id: "{{ target_fan_entity }}"
+                    data:
+                      percentage: "{{ new_speed }}"
+#                  - service: persistent_notification.create
+#                    data:
+#                        title: "CO2 Вентиляция: ПОВЫШЕНИЕ СКОРОСТИ"
+#                        message: "CO2 растет. Установка скорости {{ new_speed | int }}%."
+
+  # ОПТИМИЗАЦИЯ: Обновляем предыдущее значение CO2 в самом конце, один раз.
+  - service: input_number.set_value
+    data:
+      entity_id: "{{ previous_co2_helper_entity_id }}"
+      value: "{{ avg_co2 }}"

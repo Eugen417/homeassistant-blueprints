@@ -6,7 +6,7 @@ description: |
   
   **Important Requirement!** For the automation to work, the **HA-Battery Notes** integration must be installed and configured beforehand.
 domain: automation
-source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_RU.yaml
+source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_EN.yaml
  
 input:
   # 1. TRIGGERS

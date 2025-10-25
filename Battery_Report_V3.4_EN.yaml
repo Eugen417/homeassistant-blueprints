@@ -1,4 +1,4 @@
-name: 🪫 Battery Status Report (v3.7.1)
+name: 🪫 Battery Status Report (v4.6)
 description: |
   Creates two brief reports (separated into "Replace" and "Recharge") for devices whose charge is below the critical level.
   Sends reports to a mobile device and/or Telegram at a specified time and days of the week, including the type and quantity of battery cells.

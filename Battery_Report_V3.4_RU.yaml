@@ -1,13 +1,13 @@
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.6)
+  name: 🪫 Отчет по состоянию батарей (v3.7)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
-    Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время и дни недели, с указанием типа и количества элементов питания. 
-    Опционально (только для Telegram) может отправляться полный отчет о состоянии заряда всех батарей и указанием общего количества батарей по типу.
+    Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время и дни недели.
     
-    **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
+    **ВНИМАНИЕ:** Логика извлечения ID чатов Telegram исправлена для соответствия стандартному формату: к длинным ID групп/каналов принудительно добавляется минус (`-`).
+    **Требование:** Необходимо установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_RU.yaml
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.12_RU.yaml
   
   input:
     # 1. ТРИГГЕРЫ
@@ -49,9 +49,15 @@ blueprint:
         device:
           integration: mobile_app
 
+    # ПОЛЯ TELEGRAM: Комбинация выбора UI и надежности
+    telegram_config_id:
+      name: 🤖 ID конфигурации Telegram Bot
+      description: Уникальный ID вашего бота (например, 01K7VE6106J5F1Q4R9WPFCYP3S).
+      selector:
+        text:
     telegram_notify_target:
-      name: Сервис уведомлений Telegram
-      description: Выберите сущность вашего сервиса Telegram (notify.telegram_bot_...).
+      name: 💬 Целевые уведомления Telegram
+      description: Выберите сущности вашего сервиса Telegram (notify.telegram_bot_...). Их ID будут извлечены автоматически.
       default:
         entity_id: []
       selector:
@@ -114,7 +120,8 @@ blueprint:
 
 variables:
   mobile_device_id: !input mobile_notify_target
-  telegram_target_id: !input telegram_notify_target 
+  telegram_config_id: !input telegram_config_id
+  telegram_notify_entities: !input telegram_notify_target 
   critical_threshold: !input critical_level
   excluded_entity_ids: !input excluded_sensors
   send_full_report: !input send_full_report_option
@@ -128,7 +135,6 @@ trigger:
 action:
   # ----------------------------------------------------------------------
   # 1. РАССЧЕТ И ГЕНЕРАЦИЯ СООБЩЕНИЙ (КРАТКИЙ И ПОЛНЫЙ)
-  #    Этот блок выполняется всегда.
   # ----------------------------------------------------------------------
   - alias: Рассчитать отчеты
     variables:
@@ -280,7 +286,6 @@ action:
 
   # ----------------------------------------------------------------------
   # 2. ОТПРАВКА ОТЧЕТА 1: НЕЗАРЯЖАЕМЫЕ (ЗАМЕНА)
-  #    Включает проверку дней для КРАТКОГО ОТЧЕТА.
   # ----------------------------------------------------------------------
   - alias: Отправить Отчет 1 - Незаряжаемые (Условно)
     choose:
@@ -295,7 +300,7 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          # 2.1 Мобильное приложение (Условное выполнение внутри)
+          # 2.1 Мобильное приложение
           - alias: Мобильное приложение - Отчет о незаряжаемых (Условно)
             choose:
               - conditions:
@@ -307,19 +312,36 @@ action:
                       title: "🪫 ТРЕБУЕТСЯ ЗАМЕНА: Батареи, заряд < {{ critical_threshold }}%"
                       message: "{{ disposable_message }}"
           
-          # 2.2 Сервис Telegram Bot (MarkdownV2) (Условное выполнение внутри)
+          # 2.2 Сервис Telegram Bot
+          - alias: Telegram - Определить целевые ID чатов для Отчета 1
+            variables:
+              # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
+              target_chat_ids: >-
+                {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+                {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+                {% set ns = namespace(target_ids=[]) %}
+                {% for id_string in chat_id_strings %}
+                  {% set cleaned_id = id_string | string | trim %}
+                  {# Если ID длинный (более 10 символов) и не начинается с минуса, добавляем минус #}
+                  {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+                    {% set id_with_hyphen = '-' ~ cleaned_id %}
+                    {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+                  {% else %}
+                    {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.target_ids }}
+
           - alias: Telegram - Отчет о незаряжаемых (Условно)
             choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ telegram_target_id.entity_id | length > 0 }}"
+                    value_template: "{{ telegram_config_id is not none and telegram_config_id != '' and target_chat_ids | length > 0 }}"
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      chat_id: >-
-                        {% set entity_id = telegram_target_id.entity_id[0] %}
-                        {% set parts = entity_id.split('_') %}
-                        {{ parts[-1] }}
+                      config_entry_id: "{{ telegram_config_id }}"
+                      target: "{{ target_chat_ids }}" # ID чатов с корректно добавленным минусом
                       message: |
                         {% set report_body = disposable_message %}
                         {% set header = "🪫 ТРЕБУЕТСЯ ЗАМЕНА: Батареи, заряд < " ~ critical_threshold ~ "%" %}
@@ -328,10 +350,9 @@ action:
                         {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
                         {{ header ~ "\n\n" ~ escaped_body }}
                       parse_mode: markdownv2
-      
+  
   # ----------------------------------------------------------------------
   # 3. ОТПРАВКА ОТЧЕТА 2: ЗАРЯЖАЕМЫЕ (ЗАРЯДКА)
-  #    Включает проверку дней для КРАТКОГО ОТЧЕТА.
   # ----------------------------------------------------------------------
   - alias: Отправить Отчет 2 - Заряжаемые (Условно)
     choose:
@@ -346,7 +367,7 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          # 3.1 Мобильное приложение (Условное выполнение внутри)
+          # 3.1 Мобильное приложение
           - alias: Мобильное приложение - Отчет о заряжаемых (Условно)
             choose:
               - conditions:
@@ -358,19 +379,35 @@ action:
                       title: "🔌 ТРЕБУЕТСЯ ЗАРЯДКА: Заряд < {{ critical_threshold }}%"
                       message: "{{ rechargeable_message }}"
           
-          # 3.2 Сервис Telegram Bot (MarkdownV2) (Условное выполнение внутри)
+          # 3.2 Сервис Telegram Bot
+          - alias: Telegram - Определить целевые ID чатов для Отчета 2
+            variables:
+              # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
+              target_chat_ids: >-
+                {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+                {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+                {% set ns = namespace(target_ids=[]) %}
+                {% for id_string in chat_id_strings %}
+                  {% set cleaned_id = id_string | string | trim %}
+                  {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+                    {% set id_with_hyphen = '-' ~ cleaned_id %}
+                    {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+                  {% else %}
+                    {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.target_ids }}
+
           - alias: Telegram - Отчет о заряжаемых (Условно)
             choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ telegram_target_id.entity_id | length > 0 }}"
+                    value_template: "{{ telegram_config_id is not none and telegram_config_id != '' and target_chat_ids | length > 0 }}"
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      chat_id: >-
-                        {% set entity_id = telegram_target_id.entity_id[0] %}
-                        {% set parts = entity_id.split('_') %}
-                        {{ parts[-1] }}
+                      config_entry_id: "{{ telegram_config_id }}"
+                      target: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = rechargeable_message %}
                         {% set header = "🔌 ТРЕБУЕТСЯ ЗАРЯДКА: Заряд < " ~ critical_threshold ~ "%" %}
@@ -379,16 +416,33 @@ action:
                         {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
                         {{ header ~ "\n\n" ~ escaped_body }}
                       parse_mode: markdownv2
-      
+  
   # ----------------------------------------------------------------------
   # 4. ОТПРАВКА ОТЧЕТА 3: ПОЛНЫЙ СПИСОК (ОПЦИОНАЛЬНО)
-  #    Запускается независимо от дней КРАТКОГО отчета.
   # ----------------------------------------------------------------------
+  - alias: Telegram - Определить целевые ID чатов для Полного Отчета
+    variables:
+      # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
+      target_chat_ids: >-
+        {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+        {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+        {% set ns = namespace(target_ids=[]) %}
+        {% for id_string in chat_id_strings %}
+          {% set cleaned_id = id_string | string | trim %}
+          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+            {% set id_with_hyphen = '-' ~ cleaned_id %}
+            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+          {% else %}
+            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.target_ids }}
+        
   - alias: Telegram - Отправить Полный отчет (Условно)
     choose:
       - conditions:
           - condition: template
-            value_template: "{{ telegram_target_id.entity_id | length > 0 and send_full_report }}"
+            value_template: "{{ telegram_config_id is not none and telegram_config_id != '' and target_chat_ids | length > 0 and send_full_report }}"
           - condition: template
             # Проверка дней недели для ПОЛНОГО ОТЧЕТА
             value_template: >
@@ -404,13 +458,11 @@ action:
               full_report_title: "🔋 Полный отчет по всем батареям (Отсортирован по уровню):"
               # Добавление сводки по типу батарей в сообщение
               full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
-              
+            
           - service: telegram_bot.send_message
             data:
-              chat_id: >-
-                {% set entity_id = telegram_target_id.entity_id[0] %}
-                {% set parts = entity_id.split('_') %}
-                {{ parts[-1] }}
+              config_entry_id: "{{ telegram_config_id }}"
+              target: "{{ target_chat_ids }}" 
               message: |
                 {% set report_body = full_report_message %}
                 {# Полное экранирование спецсимволов MarkdownV2 #}

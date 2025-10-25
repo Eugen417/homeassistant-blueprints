@@ -7,7 +7,7 @@ blueprint:
     
         **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.18_RU.yaml
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_RU.yaml
   
   input:
     # 1. ТРИГГЕРЫ

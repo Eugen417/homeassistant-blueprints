@@ -7,7 +7,7 @@ blueprint:
     высокий, но вентилятор выключен в ручном режиме, с кнопкой для включения.
     **ФИНАЛЬНАЯ ВЕРСИЯ:** Исправлены ошибки 'too many values to unpack' и улучшено форматирование сообщения Telegram.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_v13.1.yaml # Измените URL, если нужно
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_fan_speed_on-off.yaml # Измените URL, если нужно
 
   input:
     co2_sensors:

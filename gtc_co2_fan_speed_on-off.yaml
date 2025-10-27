@@ -1,12 +1,15 @@
 blueprint:
-  name: 💨 Управление вентиляцией по CO2 v13.5 (ФИНАЛ)
+  name: 💨 Управление вентиляцией по CO2 v13.5 (с уведомлением)
+
   description: >-
     Упрощенная автоматизация, которая управляет вентилятором по CO2,
     используя помощник `input_select` для отслеживания режима работы и
     обнаружения внешнего вмешательства. Добавлено уведомление, если CO2
     высокий, но вентилятор выключен в ручном режиме, с кнопкой для включения.
-    **ФИНАЛЬНАЯ ВЕРСИЯ:** Исправлены ошибки 'too many values to unpack' и улучшено форматирование сообщения Telegram.
+    **ИСПРАВЛЕНИЕ v13.5:** Добавлен режим разбора `markdownv2` и полное экранирование спецсимволов для корректной работы `inline_keyboard` и форматирования.
+
   domain: automation
+
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_fan_speed_on-off.yaml # Измените URL, если нужно
 
   input:
@@ -18,6 +21,7 @@ blueprint:
           domain: sensor
           device_class: carbon_dioxide
           multiple: true
+
     target_fan:
       name: Целевой вентилятор
       description: >-
@@ -28,6 +32,7 @@ blueprint:
       selector:
         entity:
           domain: fan
+
     automation_mode_select:
       name: Помощник Режима (Input Select)
       description: >-
@@ -35,6 +40,7 @@ blueprint:
       selector:
         entity:
           domain: input_select
+
     previous_co2_helper:
       name: Помощник для предыдущего CO2
       description: >-
@@ -42,31 +48,37 @@ blueprint:
       selector:
         entity:
           domain: input_number
+
     low_co2_max:
       name: Нижний порог CO2 (макс, ppm)
       default: 600
       selector:
         number: { min: 400, max: 1000, step: 1, mode: box, unit_of_measurement: ppm }
+
     max_speed:
       name: Максимальная скорость вентилятора (%)
       default: 40
       selector:
         number: { min: 10, max: 100, step: 10, mode: slider, unit_of_measurement: '%' }
+
     co2_increase_threshold:
       name: Порог повышения CO2 для включения (ppm)
       default: 15
       selector:
         number: { min: 0, max: 100, step: 1, mode: box, unit_of_measurement: ppm }
+
     co2_change_threshold:
       name: Порог изменения CO2 для скорости (ppm)
       default: 15
       selector:
         number: { min: 0, max: 50, step: 1, mode: box, unit_of_measurement: ppm }
+
     start_speed:
       name: Минимальная/Стартовая Скорость (%)
       default: 0
       selector:
         number: { min: 0, max: 100, step: 10, mode: slider, unit_of_measurement: '%' }
+
     update_frequency:
       name: Частота проверки (minutes)
       default: "/5"
@@ -85,9 +97,11 @@ blueprint:
             - domain: notify
 
 mode: single
+
 trigger:
   - platform: time_pattern
     minutes: !input update_frequency
+
 action:
   - variables:
       co2_sensors_list: !input co2_sensors
@@ -201,7 +215,7 @@ action:
                     data: { percentage: "{{ new_speed }}" }
 
   # --------------------------------------------------------------------------
-  # --- ЛОГИКА 3: УВЕДОМЛЕНИЕ О БЛОКИРОВКЕ (Финальный рабочий блок) ---
+  # --- ЛОГИКА 3: УВЕДОМЛЕНИЕ О БЛОКИРОВКЕ (Исправлено - стабильный inline_keyboard) ---
   # --------------------------------------------------------------------------
   - choose:
       - conditions:
@@ -224,17 +238,17 @@ action:
                 {%- set message_title = "💨 \*Внимание: Блокировка Вентустановки\*" %}
                 
                 {# 2. Определение Тела Сообщения (Message Body) #}
-                {%- set raw_message_body = "Уровень CO2 (" ~ (avg_co2 | round(0)) ~ " ppm) выше установленного (порог: " ~ ((low_co2_max_val | float + co2_increase_threshold_val | float) | round(0)) ~ " ppm), но автоматизация не может запустить вентустановку, потому что она выключена вручную или другой автоматизацией. Текущий режим: WAITING." %}
+                {%- set raw_message_body = "Порог CO2 (" ~ (avg_co2 | round(0)) ~ " ppm) выше установленного (порог: " ~ ((low_co2_max_val | float + co2_increase_threshold_val | float) | round(0)) ~ " ppm), но автоматизация не может запустить вентустановку, потому что она выключена вручную или другой автоматизацией. Текущий режим: WAITING." %}
                 
                 {# 3. Экранирование спецсимволов для MarkdownV2 (применяется только к телу!) #}
                 {%- set escaped_body = raw_message_body | replace('&', '&amp;') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
                 
                 {# 4. Объединение Заголовка и Тела #}
                 {{ message_title ~ "\n\n" ~ escaped_body }}
-              
+                
               parse_mode: markdownv2
               
-              # ИСПОЛЬЗУЕТСЯ ВАШ РАБОЧИЙ ФОРМАТ КНОПКИ
+              # ИСПОЛЬЗУЕТСЯ САМЫЙ НАДЕЖНЫЙ ФОРМАТ КНОПОК - СПИСОК СЛОВАРЕЙ (DICT)
               inline_keyboard:
                 - ВКЛЮЧИТЬ FAN:/turn_on_gtc_fan
 

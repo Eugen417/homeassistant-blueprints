@@ -151,7 +151,7 @@ action:
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ❌ ЗАМЕНА! (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ ")" %}
+                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ♻️ ЗАМЕНА! (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ ")" %}
                 {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -222,7 +222,7 @@ action:
               {# 2. ОПРЕДЕЛЕНИЕ ТЕКСТОВОЙ МЕТКИ АВАРИИ (На основе пользовательского critical_threshold) #}
               {% set status_label = '' %}
               {% if numerical_level < threshold %}
-                {% set status_label = ' ❌ ЗАМЕНА!' if not is_rechargeable else ' 🔌 ЗАРЯДКА!' %}
+                {% set status_label = '♻️ ЗАМЕНА!' if not is_rechargeable else ' 🔌 ЗАРЯДКА!' %}
               {% endif %}
               
               {# ДОБАВЛЕНИЕ ДЕТАЛЕЙ ТОЛЬКО ДЛЯ незаряжаемых #}
@@ -310,9 +310,9 @@ action:
                       # Динамический заголовок для мобильного приложения
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          🪫 ТРЕБУЕТСЯ ЗАМЕНА: Батареи, заряд < {{ critical_threshold }}%
+                          🪫 Отчёт Батарея+: ♻️ Заряд < {{ critical_threshold }}%
                         {% else %}
-                          ✅ ВСЕ В НОРМЕ: Замена не требуется
+                          🔋 Отчёт Батарея+: Замена не требуется
                         {% endif %}
                       message: "{{ disposable_message }}"
           
@@ -350,9 +350,9 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🪫 *ТРЕБУЕТСЯ ЗАМЕНА:* Батареи, заряд < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Отчёт Батарея+:* 🪫 Заряд < ' ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '*✅ ВСЕ В НОРМЕ:* Замена не требуется' %}
+                          {% set header = '🔋 *Отчёт Батарея+:* Замена не требуется' %}
                         {% endif %}
                         
                         {% set final_message = header ~ "\n\n" ~ report_body %}
@@ -394,9 +394,9 @@ action:
                       # Динамический заголовок для мобильного приложения
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          🔌 ТРЕБУЕТСЯ ЗАРЯДКА: Заряд < {{ critical_threshold }}%
+                          🔋 Отчёт Батарея+: 🪫 Заряд < {{ critical_threshold }}%
                         {% else %}
-                          ✅ ВСЕ В НОРМЕ: Зарядка не требуется
+                          🔋Отчёт Батарея+: Зарядка не требуется
                         {% endif %}
                       message: "{{ rechargeable_message }}"
           
@@ -433,9 +433,9 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔌 *ТРЕБУЕТСЯ ЗАРЯДКА:* Заряд < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Отчёт Батарея+:* 🪫 Заряд < ' ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '*✅ ВСЕ В НОРМЕ:* Зарядка не требуется' %}
+                          {% set header = '*🔋 Отчёт Батарея+:* Зарядка не требуется' %}
                         {% endif %}
                         
                         {% set final_message = header ~ "\n\n" ~ report_body %}
@@ -486,7 +486,7 @@ action:
         sequence:
           - variables:
               # Title for the Full report (with full escaping)
-              full_report_title: "🔋 *Полный отчет по всем батареям (Отсортирован по уровню):*"
+              full_report_title: "🔋 *Полный отчет Батарея+ (Отсортирован по уровню):*"
               # Add battery type summary to the message
               full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
             

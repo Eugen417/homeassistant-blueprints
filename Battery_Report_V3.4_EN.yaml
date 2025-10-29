@@ -161,7 +161,7 @@ action:
         {% if disposable_output | length > 0 %}
           {{ "⚠️ Devices requiring battery replacement:\n" ~ disposable_output | join('\n') }}
         {% else %}
-          {# FIX v3.7.3: Removed redundant prefix "✅ REPLACEMENT NOT REQUIRED" #}
+          {# FIX v3.7.3: Removed redundant prefix "✅♻️ REPLACEMENT NOT REQUIRED" #}
           {{ "All disposable batteries are above " ~ critical_threshold ~ "% charge." }}
         {% endif %}
 
@@ -189,7 +189,7 @@ action:
         {% if rechargeable_output | length > 0 %}
           {{ "⚠️ Devices requiring recharge:\n" ~ rechargeable_output | join('\n') }}
         {% else %}
-          {# FIX v3.7.3: Removed redundant prefix "✅ RECHARGE NOT REQUIRED" #}
+          {# FIX v3.7.3: Removed redundant prefix "✅🔌 RECHARGE NOT REQUIRED" #}
           {{ "All rechargeable devices are above " ~ critical_threshold ~ "% charge." }}
         {% endif %}
       
@@ -309,7 +309,7 @@ action:
                       # Dynamic title for mobile app
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          🔋 Battery+ Report: 🪫  Charge < {{ critical_threshold }}%
+                          🔋 Battery+ Report: 🪫♻️ Charge < {{ critical_threshold }}%
                         {% else %}
                           🔋 Battery+ Report: Replacement not required
                         {% endif %}
@@ -349,7 +349,7 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔋 *Battery+ Report:* 🪫 Charge < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Battery+ Report:* 🪫♻️ Charge < ' ~ critical_threshold ~ '%' %}
                         {% else %}
                           {% set header = '🔋 *Battery+ Report:* Replacement not required' %}
                         {% endif %}
@@ -393,7 +393,7 @@ action:
                       # Dynamic title for mobile app
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          🔋 Battery+ Report: 🪫 Charge < {{ critical_threshold }}%
+                          🔋 Battery+ Report: 🪫🔌 Charge < {{ critical_threshold }}%
                         {% else %}
                           🔋 Battery+ Report: Recharge not required
                         {% endif %}
@@ -432,7 +432,7 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔋 *Battery+ Report:* 🪫 Charge < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Battery+ Report:* 🪫🔌 Charge < ' ~ critical_threshold ~ '%' %}
                         {% else %}
                           {% set header = '*🔋 Battery+ Report:* Recharge not required' %}
                         {% endif %}

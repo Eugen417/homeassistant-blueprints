@@ -1,7 +1,7 @@
-id: automation_battery_status_report_v4_7_2 
+id: automation_battery_status_report_v4_7_3_en # Correct ID location and version
 
 blueprint:
-  name: 🪫 Battery Status Report (v4.7.2)
+  name: 🪫 Battery Status Report (v4.7.3)en
   description: |
     Creates two brief reports (separated into "Replacement" and "Recharge") for devices whose charge is below the critical level.
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the battery type and quantity.
@@ -137,6 +137,7 @@ action:
       exclude_list: "{{ excluded_entity_ids.entity_id | default([]) }}"
 
       # Message for non-rechargeable batteries (Replacement) - SHORT REPORT 1
+      # Returns list of devices OR empty string
       disposable_message: >-
         {% set ns = namespace(disposable_lines=[]) %}
         {% for sensor in states.sensor %}
@@ -145,9 +146,7 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Battery+" from the sensor name #}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
               {% set is_rechargeable = (battery_type == 'Rechargeable') %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
@@ -160,12 +159,15 @@ action:
         {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %}
         {% set disposable_output = sorted_disposable | map(attribute='line') | list %}
         {% if disposable_output | length > 0 %}
-          {{ "⚠️ Devices requiring battery replacement:\n" ~ disposable_output | join('\n') }}
+          {{ disposable_output | join('\n') }}
         {% else %}
-          ✅ All non-rechargeable batteries are above {{ critical_threshold }}%.
+          "" # Empty string if no issues
         {% endif %}
+      
+      disposable_count: "{{ ns.disposable_lines | length }}"
 
       # Message for rechargeable devices (Recharge) - SHORT REPORT 2
+      # Returns list of devices OR empty string
       rechargeable_message: >-
         {% set ns = namespace(rechargeable_lines=[]) %}
         {% for sensor in states.sensor %}
@@ -174,9 +176,7 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {# Remove " Battery+" from the sensor name #}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
               {% set is_rechargeable = (battery_type == 'Rechargeable') %}
               {% if is_rechargeable %}
                 {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 RECHARGE!" %}
@@ -188,10 +188,12 @@ action:
         {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %}
         {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %}
         {% if rechargeable_output | length > 0 %}
-          {{ "⚠️ Devices requiring a recharge:\n" ~ rechargeable_output | join('\n') }}
+          {{ rechargeable_output | join('\n') }}
         {% else %}
-          ✅ All rechargeable devices are above {{ critical_threshold }}%.
+          "" # Empty string if no issues
         {% endif %}
+        
+      rechargeable_count: "{{ ns.rechargeable_lines | length }}"
 
       # REPORT 3: FULL LIST OF ALL BATTERIES (MESSAGE BODY WITH DETAILS)
       full_report_body_list: >-
@@ -208,7 +210,6 @@ action:
             {% if numerical_level >= 0 %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
               {% set is_rechargeable = (battery_type == 'Rechargeable') %}
 
               {# 1. DETERMINE COLOR STATUS (Based on fixed thresholds 15/40) #}
@@ -307,8 +308,19 @@ action:
                 sequence:
                   - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
-                      title: "🪫 REPLACEMENT REQUIRED: Batteries, charge < {{ critical_threshold }}%"
-                      message: "{{ disposable_message }}"
+                      # DYNAMIC TITLE/HEADER
+                      title: >-
+                        {% if disposable_count | int > 0 %}
+                          🪫 REPLACEMENT REQUIRED: Batteries, charge < {{ critical_threshold }}%
+                        {% else %}
+                          ✅ All Batteries OK
+                        {% endif %}
+                      message: >-
+                        {% if disposable_count | int > 0 %}
+                          Devices with charge < {{ critical_threshold }}%:\n{{ disposable_message }}
+                        {% else %}
+                          All non-rechargeable batteries are above {{ critical_threshold }}%.
+                        {% endif %}
 
           # 2.2 Telegram Bot Service
           - alias: Telegram - Determine target Chat IDs for Report 1
@@ -341,12 +353,19 @@ action:
                     data:
                       target: "{{ target_chat_ids }}" # Chat IDs with correctly added hyphen
                       message: |
-                        {% set report_body = disposable_message %}
-                        {% set header = "🪫 REPLACEMENT REQUIRED: Batteries, charge < " ~ critical_threshold ~ "%" %}
-
-                        {# Full escaping of MarkdownV2 special characters #}
-                        {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
-                        {{ header ~ "\n\n" ~ escaped_body }}
+                        {% set body_message = disposable_message %}
+                        
+                        {% if disposable_count | int > 0 %}
+                          {% set header = '🪫 *REPLACEMENT REQUIRED:* Batteries, charge < ' ~ critical_threshold ~ '%' %}
+                          {% set final_message = header ~ "\n\n" ~ body_message %}
+                        {% else %}
+                          {% set header = '*✅ All non-rechargeable batteries are OK\\.*' %}
+                          {% set final_message = header ~ "\nAll non-rechargeable batteries are above " ~ critical_threshold ~ "%\\." | replace('.', '\.') %}
+                        {% endif %}
+                        
+                        {# Full escaping of MarkdownV2 special characters for the entire message #}
+                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                        {{ escaped_message }}
                       parse_mode: markdownv2
 
   # ----------------------------------------------------------------------
@@ -374,8 +393,19 @@ action:
                 sequence:
                   - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
-                      title: "🔌 RECHARGE REQUIRED: Charge < {{ critical_threshold }}%"
-                      message: "{{ rechargeable_message }}"
+                      # DYNAMIC TITLE/HEADER
+                      title: >-
+                        {% if rechargeable_count | int > 0 %}
+                          🔌 RECHARGE REQUIRED: Charge < {{ critical_threshold }}%
+                        {% else %}
+                          ✅ All Rechargeable OK
+                        {% endif %}
+                      message: >-
+                        {% if rechargeable_count | int > 0 %}
+                          Devices with charge < {{ critical_threshold }}%:\n{{ rechargeable_message }}
+                        {% else %}
+                          All rechargeable devices are above {{ critical_threshold }}%.
+                        {% endif %}
 
           # 3.2 Telegram Bot Service
           - alias: Telegram - Determine target Chat IDs for Report 2
@@ -407,12 +437,19 @@ action:
                     data:
                       target: "{{ target_chat_ids }}"
                       message: |
-                        {% set report_body = rechargeable_message %}
-                        {% set header = "🔌 RECHARGE REQUIRED: Charge < " ~ critical_threshold ~ "%" %}
+                        {% set body_message = rechargeable_message %}
+                        
+                        {% if rechargeable_count | int > 0 %}
+                          {% set header = '🔌 *RECHARGE REQUIRED:* Charge < ' ~ critical_threshold ~ '%' %}
+                          {% set final_message = header ~ "\n\n" ~ body_message %}
+                        {% else %}
+                          {% set header = '*✅ All rechargeable devices are OK\\.*' %}
+                          {% set final_message = header ~ "\nAll rechargeable devices are above " ~ critical_threshold ~ "%\\." | replace('.', '\.') %}
+                        {% endif %}
 
-                        {# Full escaping of MarkdownV2 special characters #}
-                        {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
-                        {{ header ~ "\n\n" ~ escaped_body }}
+                        {# Full escaping of MarkdownV2 special characters for the entire message #}
+                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                        {{ escaped_message }}
                       parse_mode: markdownv2
 
   # ----------------------------------------------------------------------
@@ -454,7 +491,7 @@ action:
         sequence:
           - variables:
               # Title for Full Report (with full escaping)
-              full_report_title: "🔋 Full Report for all Batteries (Sorted by Level):"
+              full_report_title: "🔋 *Full Report for all Batteries (Sorted by Level):*"
               # Add summary by battery type to the message
               full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
 

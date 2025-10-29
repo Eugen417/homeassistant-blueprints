@@ -1,5 +1,6 @@
-blueprint: # <-- THIS KEY WAS MISSING
-  name: 🪫 Battery Status Report (v4.7.1)
+blueprint:
+  id: battery_status_report_v4_7_2
+  name: 🪫 Battery Status Report (v4.7.2)
   description: |
     Creates two brief reports (separated into "Replacement" and "Recharge") for devices whose charge is below the critical level.
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the battery type and quantity.
@@ -12,12 +13,12 @@ blueprint: # <-- THIS KEY WAS MISSING
   input:
     # 1. TRIGGERS
     trigger_time:
-      name: Start Time
+      name: ⏰ Start Time
       description: The time for the daily check (e.g., 08:00:00).
       selector:
         time:
     trigger_days:
-      name: Days of the Week for Check (SHORT REPORT)
+      name: 📅 Days of the Week for Check (SHORT REPORT)
       description: Select the days when the SHORT report should run (optional). If none are selected, it runs every day.
       default: []
       selector:
@@ -42,7 +43,7 @@ blueprint: # <-- THIS KEY WAS MISSING
     # 2. DEVICES AND THRESHOLDS
 
     mobile_notify_target:
-      name: Mobile Device (Home Assistant App)
+      name: 📱 Mobile Device (Home Assistant App)
       description: Select ONE device for push notifications. Leave empty if not needed.
       default: ""
       selector:
@@ -60,14 +61,14 @@ blueprint: # <-- THIS KEY WAS MISSING
             - domain: notify
 
     send_full_report_option:
-      name: Send Full Report as a second message (Telegram)?
+      name: 📑 Send Full Report as a second message (Telegram)?
       description: Enable to receive a complete list of all batteries.
       default: false
       selector:
         boolean:
 
     full_report_days:
-      name: Days of the Week for FULL REPORT (Telegram)
+      name: 🗓️ Days of the Week for FULL REPORT (Telegram)
       description: Select the days when the full report should be sent if the option is enabled. Leave empty for daily sending.
       default: []
       selector:
@@ -90,7 +91,7 @@ blueprint: # <-- THIS KEY WAS MISSING
               value: Sun
 
     critical_level:
-      name: Critical Level (%)
+      name: 🔥 Critical Level (%)
       description: The charge level below which a device is marked as requiring RECHARGE/REPLACEMENT. Default is 15%.
       default: 15
       selector:
@@ -102,7 +103,7 @@ blueprint: # <-- THIS KEY WAS MISSING
           mode: box
 
     excluded_sensors:
-      name: Excluded Sensors ("Battery+")
+      name: 🗑️ Excluded Sensors ("Battery+")
       description: Charge level sensors to exclude from the report. Select those marked as **"Battery+"**.
       default:
         entity_id: []
@@ -145,7 +146,8 @@ action:
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
               {# Remove " Battery+" from the sensor name #}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
+              {% set is_rechargeable = (battery_type == 'Rechargeable') %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
                 {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ❌ REPLACEMENT! (Type: " ~ battery_type ~ ", Qty: " ~ battery_quantity ~ ")" %}
@@ -157,7 +159,7 @@ action:
         {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %}
         {% set disposable_output = sorted_disposable | map(attribute='line') | list %}
         {% if disposable_output | length > 0 %}
-          {{ "⚠ Devices requiring battery replacement:\n" ~ disposable_output | join('\n') }}
+          {{ "⚠️ Devices requiring battery replacement:\n" ~ disposable_output | join('\n') }}
         {% else %}
           ✅ All non-rechargeable batteries are above {{ critical_threshold }}%.
         {% endif %}
@@ -173,7 +175,8 @@ action:
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
               {# Remove " Battery+" from the sensor name #}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
+              {% set is_rechargeable = (battery_type == 'Rechargeable') %}
               {% if is_rechargeable %}
                 {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 RECHARGE!" %}
                 {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
@@ -184,7 +187,7 @@ action:
         {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %}
         {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %}
         {% if rechargeable_output | length > 0 %}
-          {{ "⚠ Devices requiring a recharge:\n" ~ rechargeable_output | join('\n') }}
+          {{ "⚠️ Devices requiring a recharge:\n" ~ rechargeable_output | join('\n') }}
         {% else %}
           ✅ All rechargeable devices are above {{ critical_threshold }}%.
         {% endif %}
@@ -204,7 +207,8 @@ action:
             {% if numerical_level >= 0 %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
               {% set cleaned_name = name | replace(' Battery+', '') | trim %}
-              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {# Rely solely on 'Rechargeable' attribute from HA-Battery Notes #}
+              {% set is_rechargeable = (battery_type == 'Rechargeable') %}
 
               {# 1. DETERMINE COLOR STATUS (Based on fixed thresholds 15/40) #}
               {% set status_icon = '🟢' %}
@@ -238,7 +242,7 @@ action:
         {% if all_output | length > 0 %}
           {{ all_output | join('\n') }}
         {% else %}
-          Battery sensors not found.
+          ❌ Battery sensors not found.
         {% endif %}
 
       # REPORT 4: SUMMARY BY BATTERY TYPE (Total number of elements)
@@ -340,7 +344,7 @@ action:
                         {% set header = "🪫 REPLACEMENT REQUIRED: Batteries, charge < " ~ critical_threshold ~ "%" %}
 
                         {# Full escaping of MarkdownV2 special characters #}
-                        {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                        {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
                         {{ header ~ "\n\n" ~ escaped_body }}
                       parse_mode: markdownv2
 
@@ -406,7 +410,7 @@ action:
                         {% set header = "🔌 RECHARGE REQUIRED: Charge < " ~ critical_threshold ~ "%" %}
 
                         {# Full escaping of MarkdownV2 special characters #}
-                        {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                        {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
                         {{ header ~ "\n\n" ~ escaped_body }}
                       parse_mode: markdownv2
 
@@ -459,7 +463,7 @@ action:
               message: |
                 {% set report_body = full_report_message %}
                 {# Full escaping of MarkdownV2 special characters #}
-                {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
+                {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
                 {{ escaped_body }}
               parse_mode: markdownv2
 

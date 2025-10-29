@@ -1,7 +1,7 @@
-id: automation_battery_status_report_v4_7_2 # <--- ✅ КОРРЕКТНОЕ РАСПОЛОЖЕНИЕ
+id: automation_battery_status_report_v4_7_2 
 
 blueprint:
-  name: 🪫 Battery Status Report (v4.7.2) # Обновлено имя для соответствия ID
+  name: 🪫 Battery Status Report (v4.7.2)
   description: |
     Creates two brief reports (separated into "Replacement" and "Recharge") for devices whose charge is below the critical level.
     Sends reports to a mobile device and/or Telegram at a specified time and days of the week, indicating the battery type and quantity.

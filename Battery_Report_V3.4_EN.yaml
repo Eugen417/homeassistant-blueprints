@@ -1,7 +1,6 @@
-id: automation_battery_status_report_v3_7_4_en
-
+id: automation_battery_status_report_v4_7_5_en
 blueprint:
-  name: 🪫 Battery Status Report (v3.7.4)
+  name: 🪫 Battery Status Report (v4.7.5)
   description: |
     Creates two short reports (separated into "Replacement" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to the mobile device and/or Telegram at the specified time and days, indicating the type and quantity of batteries. 
@@ -151,7 +150,7 @@ action:
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ❌ REPLACE! (Type: " ~ battery_type ~ ", Qty: " ~ battery_quantity ~ ")" %}
+                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ♻️ REPLACE! (Type: " ~ battery_type ~ ", Qty: " ~ battery_quantity ~ ")" %}
                 {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -222,7 +221,7 @@ action:
               {# 2. DEFINE ALERT TEXT LABEL (Based on user's critical_threshold) #}
               {% set status_label = '' %}
               {% if numerical_level < threshold %}
-                {% set status_label = ' ❌ REPLACE!' if not is_rechargeable else ' 🔌 RECHARGE!' %}
+                {% set status_label = ' ♻️ REPLACE!' if not is_rechargeable else ' 🔌 RECHARGE!' %}
               {% endif %}
               
               {# ADD DETAILS ONLY FOR disposable #}
@@ -271,8 +270,8 @@ action:
             {% set display_type = 'Built-in Battery' %}
           {% endif %}
 
-          {# Formatted string: • [Type] (Total: [Quantity] pcs) #}
-          {% set line = "• " ~ display_type ~ " (Total: " ~ total_quantity.value ~ " pcs)" %}
+          {# Formatted string: • [Type] (Total: [Quantity] units) #}
+          {% set line = "• " ~ display_type ~ " (Total: " ~ total_quantity.value ~ " units)" %}
           {% set ns.output_lines = ns.output_lines + [line] %}
         {% endfor %}
         
@@ -310,9 +309,9 @@ action:
                       # Dynamic title for mobile app
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          🪫 REPLACEMENT REQUIRED: Batteries, charge < {{ critical_threshold }}%
+                          🪫 Battery+ Report: ♻️ Charge < {{ critical_threshold }}%
                         {% else %}
-                          ✅ ALL GOOD: Replacement not required
+                          🔋 Battery+ Report: Replacement not required
                         {% endif %}
                       message: "{{ disposable_message }}"
           
@@ -350,9 +349,9 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🪫 *REPLACEMENT REQUIRED:* Batteries, charge < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Battery+ Report:* 🪫 Charge < ' ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '*✅ ALL GOOD:* Replacement not required' %}
+                          {% set header = '🔋 *Battery+ Report:* Replacement not required' %}
                         {% endif %}
                         
                         {% set final_message = header ~ "\n\n" ~ report_body %}
@@ -394,9 +393,9 @@ action:
                       # Dynamic title for mobile app
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          🔌 RECHARGE REQUIRED: Charge < {{ critical_threshold }}%
+                          🔋 Battery+ Report: 🪫 Charge < {{ critical_threshold }}%
                         {% else %}
-                          ✅ ALL GOOD: Recharge not required
+                          🔋 Battery+ Report: Recharge not required
                         {% endif %}
                       message: "{{ rechargeable_message }}"
           
@@ -433,9 +432,9 @@ action:
                         
                         {# Form the header with Markdown formatting #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔌 *RECHARGE REQUIRED:* Charge < ' ~ critical_threshold ~ '%' %}
+                          {% set header = '🔋 *Battery+ Report:* 🪫 Charge < ' ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '*✅ ALL GOOD:* Recharge not required' %}
+                          {% set header = '*🔋 Battery+ Report:* Recharge not required' %}
                         {% endif %}
                         
                         {% set final_message = header ~ "\n\n" ~ report_body %}
@@ -486,7 +485,7 @@ action:
         sequence:
           - variables:
               # Title for the Full report (with full escaping)
-              full_report_title: "🔋 *Full Battery Status Report (Sorted by Level):*"
+              full_report_title: "🔋 *Full Battery+ Report (Sorted by Level):*"
               # Add battery type summary to the message
               full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
             

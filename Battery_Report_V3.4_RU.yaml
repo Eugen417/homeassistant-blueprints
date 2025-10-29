@@ -1,10 +1,12 @@
+id: automation_otchet_po_sostoianiiu_batarei_v3_7_4_ru # <--- ДОБАВЛЕН УНИКАЛЬНЫЙ ID
+
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.7.3)
+  name: 🪫 Отчет по состоянию батарей (v3.7.4)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время и дни недели, с указанием типа и количества элементов питания. 
     
-    **Финальная правка:** Убрано дублирование статуса "ОК" (✅ ЗАРЯДКА/ЗАМЕНА НЕ ТРЕБУЕТСЯ) из тела сообщения, когда заголовок уже содержит "ВСЕ В НОРМЕ".
+    **ИСПРАВЛЕНИЕ v3.7.4:** Критическое исправление для экранирования MarkdownV2 в сообщениях Telegram, из-за которого краткие отчеты могли не отправляться.
     
     **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
@@ -227,7 +229,7 @@ action:
               {% set details = "" %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set details = " (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ ")" %}
+                {% set details = " (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ " шт)" %}
               {% endif %}
 
               {% set line = status_icon ~ " " ~ cleaned_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
@@ -345,12 +347,23 @@ action:
                       target: "{{ target_chat_ids }}" # ID чатов с корректно добавленным минусом
                       message: |
                         {% set report_body = disposable_message %}
-                        {# Динамический заголовок для Telegram #}
-                        {% set header = "🪫 ТРЕБУЕТСЯ ЗАМЕНА: Батареи, заряд < " ~ critical_threshold ~ "%" if report_body.startswith('⚠️') else "✅ ВСЕ В НОРМЕ: Замена не требуется" %}
                         
-                        {# Полное экранирование спецсимволов MarkdownV2 #}
-                        {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
-                        {{ header ~ "\n\n" ~ escaped_body }}
+                        {# Form the header with Markdown formatting #}
+                        {% if report_body.startswith('⚠️') %}
+                          {% set header = '🪫 *ТРЕБУЕТСЯ ЗАМЕНА:* Батареи, заряд < ' ~ critical_threshold ~ '%' %}
+                        {% else %}
+                          {% set header = '*✅ ВСЕ В НОРМЕ:* Замена не требуется' %}
+                        {% endif %}
+                        
+                        {% set final_message = header ~ "\n\n" ~ report_body %}
+                        
+                        {# Полное экранирование спецсимволов MarkdownV2. #}
+                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                        
+                        {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
+                        {% set restored_bold_message = escaped_message | replace('\*', '*', 2) %}
+                        
+                        {{ restored_bold_message }}
                       parse_mode: markdownv2
   
   # ----------------------------------------------------------------------
@@ -417,12 +430,23 @@ action:
                       target: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = rechargeable_message %}
-                        {# Динамический заголовок для Telegram #}
-                        {% set header = "🔌 ТРЕБУЕТСЯ ЗАРЯДКА: Заряд < " ~ critical_threshold ~ "%" if report_body.startswith('⚠️') else "✅ ВСЕ В НОРМЕ: Зарядка не требуется" %}
                         
-                        {# Полное экранирование спецсимволов MarkdownV2 #}
-                        {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
-                        {{ header ~ "\n\n" ~ escaped_body }}
+                        {# Form the header with Markdown formatting #}
+                        {% if report_body.startswith('⚠️') %}
+                          {% set header = '🔌 *ТРЕБУЕТСЯ ЗАРЯДКА:* Заряд < ' ~ critical_threshold ~ '%' %}
+                        {% else %}
+                          {% set header = '*✅ ВСЕ В НОРМЕ:* Зарядка не требуется' %}
+                        {% endif %}
+                        
+                        {% set final_message = header ~ "\n\n" ~ report_body %}
+                        
+                        {# Полное экранирование спецсимволов MarkdownV2. #}
+                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                        
+                        {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
+                        {% set restored_bold_message = escaped_message | replace('\*', '*', 2) %}
+                        
+                        {{ restored_bold_message }}
                       parse_mode: markdownv2
   
   # ----------------------------------------------------------------------
@@ -461,9 +485,9 @@ action:
               {% endif %}
         sequence:
           - variables:
-              # Заголовок для Полного отчета (с полным экранированием)
-              full_report_title: "🔋 Полный отчет по всем батареям (Отсортирован по уровню):"
-              # Добавление сводки по типу батарей в сообщение
+              # Title for the Full report (with full escaping)
+              full_report_title: "🔋 *Полный отчет по всем батареям (Отсортирован по уровню):*"
+              # Add battery type summary to the message
               full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
             
           - service: telegram_bot.send_message
@@ -471,9 +495,13 @@ action:
               target: "{{ target_chat_ids }}" 
               message: |
                 {% set report_body = full_report_message %}
-                {# Полное экранирование спецсимволов MarkdownV2 #}
-                {% set escaped_body = report_body | replace('&', '&') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') %}
-                {{ escaped_body }}
+                {# Полное экранирование спецсимволов MarkdownV2. Восстанавливаем звездочки для заголовка. #}
+                {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                
+                {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
+                {% set restored_bold_message = escaped_body | replace('\*', '*', 2) %}
+                
+                {{ restored_bold_message }}
               parse_mode: markdownv2
     
 mode: single

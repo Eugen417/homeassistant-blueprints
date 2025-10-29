@@ -309,7 +309,7 @@ action:
                       # Dynamic title for mobile app
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          🪫 Battery+ Report: ♻️ Charge < {{ critical_threshold }}%
+                          🔋 Battery+ Report: 🪫  Charge < {{ critical_threshold }}%
                         {% else %}
                           🔋 Battery+ Report: Replacement not required
                         {% endif %}

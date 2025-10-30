@@ -1,7 +1,7 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_7_6_ru # <--- ДОБАВЛЕН УНИКАЛЬНЫЙ ID
+id: automation_otchet_po_sostoianiiu_batarei_v3_7_7_ru # <--- ДОБАВЛЕН УНИКАЛЬНЫЙ ID
 
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.7.6)
+  name: 🪫 Отчет по состоянию батарей (v3.7.7)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время и дни недели, с указанием типа и количества элементов питания. 
@@ -103,7 +103,7 @@ blueprint:
           step: 1
           unit_of_measurement: "%"
           mode: box
-          
+        
     excluded_sensors:
       name: 🗑️ Исключаемые сенсоры ("Батарея+")
       description: Сенсоры уровня заряда, которые нужно исключить из отчета. Выберите те, которые помечены как **"Батарея+"**.
@@ -321,7 +321,13 @@ action:
             variables:
               # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
               target_chat_ids: >-
-                {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+                {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
+                {# 1. Получаем сырые данные #}
+                {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+                {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
+                {% set selected_entities = [selected_entities_raw] | flatten %}
+                {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
+                
                 {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
                 {% set ns = namespace(target_ids=[]) %}
                 {% for id_string in chat_id_strings %}
@@ -405,7 +411,13 @@ action:
             variables:
               # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
               target_chat_ids: >-
-                {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+                {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
+                {# 1. Получаем сырые данные #}
+                {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+                {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
+                {% set selected_entities = [selected_entities_raw] | flatten %}
+                {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
+                
                 {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
                 {% set ns = namespace(target_ids=[]) %}
                 {% for id_string in chat_id_strings %}
@@ -456,7 +468,13 @@ action:
     variables:
       # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
       target_chat_ids: >-
-        {% set selected_entities = telegram_notify_entities.entity_id | default([]) %}
+        {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
+        {# 1. Получаем сырые данные #}
+        {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+        {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
+        {% set selected_entities = [selected_entities_raw] | flatten %}
+        {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
+        
         {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
         {% set ns = namespace(target_ids=[]) %}
         {% for id_string in chat_id_strings %}

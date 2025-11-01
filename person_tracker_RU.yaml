@@ -72,16 +72,11 @@ action:
       # --- АВТОМАТИЧЕСКОЕ ИЗВЛЕЧЕНИЕ ID ЧАТА ИЗ notify.xxx ---
       notify_target_id: >-
         {% set entity_id = telegram_notifications_id | default('') %}
-        {# Извлекаем всё после последнего "_" #}
         {% set chat_id_part = entity_id | regex_replace(find='^.+_', replace='') | string | trim %}
-        
         {% set final_id = chat_id_part %}
-        {# Эвристика: если длинный и без минуса, добавляем минус для групповых чатов #}
         {% if final_id | length > 10 and not final_id.startswith('-') %}
           {% set final_id = '-' ~ final_id %}
         {% endif %}
-        
-        {# Возвращаем в виде списка, как требует сервис telegram_bot #}
         {{ [final_id] }}
       
   - choose:
@@ -93,7 +88,6 @@ action:
           - variables:
               triggered_person_id: "{{ trigger.entity_id }}"
               triggered_person_name: "{{ state_attr(trigger.entity_id, 'friendly_name') | default(trigger.entity_id.split('.')[1]) }}"
-              # Генерируем команду, используя ЛАТИНСКИЙ ID (eugene, admin)
               button_command: "/где_{{ trigger.entity_id.split('.')[1] }}"
           
           - service: telegram_bot.send_message
@@ -123,46 +117,58 @@ action:
           - condition: trigger
             id: location_request
           - condition: template
-            # Проверяем, что команда соответствует формату /где_ и ID находится в списке отслеживаемых сущностей
             value_template: >
               {% set cmd_part = trigger.event.data.command.split('_')[1] | default('none') | lower %}
               {{ trigger.event.data.command.startswith('/где_') and 'person.' + cmd_part in tracked_persons_ids }}
         sequence:
           - variables:
               target_name_id: "{{ trigger.event.data.command.split('_')[1] }}"
-              # ПРЯМОЕ ИЗВЛЕЧЕНИЕ: Реконструируем ID сущности (person.eugene) из команды
               target_person_id: "person.{{ target_name_id }}" 
               target_person_name: "{{ state_attr(target_person_id, 'friendly_name') | default(target_person_id.split('.')[1]) }}"
               chat_id_response: "{{ trigger.event.data.chat_id | int }}"
+              # Извлечение имени запросившего
+              sender_name: >-
+                {% set first_name = trigger.event.data.from_first | default('') %}
+                {% set user_id = trigger.event.data.user_id | default('') %}
+                
+                {% if first_name | length > 0 %}
+                  {{ first_name }}
+                {% elif user_id | string | length > 0 %}
+                  [ID: {{ user_id }}]
+                {% else %}
+                  Неизвестный пользователь
+                {% endif %}
           
           # Отвечаем на callback (убираем надпись "Загрузка...")
           - service: telegram_bot.answer_callback_query
             data:
               callback_query_id: "{{ trigger.event.data.id }}"
-              message: "Ищу {{ target_person_name }}... ⏳"
+              message: "Запрос от {{ sender_name }}. Ищу {{ target_person_name }}... ⏳"
               show_alert: false
           
           # Отправка статуса и карты
           - choose:
+              # Если координаты ЕСТЬ
               - conditions:
                   - condition: template
-                    # Проверяем наличие координат у найденной сущности
                     value_template: "{{ state_attr(target_person_id, 'latitude') is not none }}"
                 sequence:
                   - variables:
+                      # ФИКС: Используем чистую многострочную строку без HTML-тегов
                       status_message: |-
                         {% if is_state(target_person_id, 'home') %}
-                          <b>{{ target_person_name }} дома! 🏡</b>
+                          {{ target_person_name }} дома! 🏡
                         {% else %}
-                          <b>{{ target_person_name }} не дома! 🗺️</b>
+                          {{ target_person_name }} не дома! 🗺️
                         {% endif %}
+                        Запрошено: {{ sender_name }}
                   
-                  # 1. ОТПРАВЛЯЕМ ПЕРВОЕ СООБЩЕНИЕ (Статус)
+                  # 1. ОТПРАВЛЯЕМ ПЕРВОЕ СООБЩЕНИЕ (Статус + Имя)
                   - service: telegram_bot.send_message
                     data:
                       target: "{{ chat_id_response }}"
                       message: "{{ status_message }}"
-                      parse_mode: html
+                      parse_mode: plain_text # Используем plain_text
                       
                   # 2. ОТПРАВЛЯЕМ ВТОРОЕ СООБЩЕНИЕ (Карта)
                   - service: telegram_bot.send_location
@@ -171,7 +177,7 @@ action:
                       latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                       longitude: "{{ state_attr(target_person_id, 'longitude') }}"
                   
-              # Если координат нет
+              # Если координат НЕТ
               - conditions:
                   - condition: template
                     value_template: "{{ state_attr(target_person_id, 'latitude') is none }}"
@@ -179,7 +185,10 @@ action:
                   - service: telegram_bot.send_message
                     data:
                       target: "{{ chat_id_response }}"
-                      message: "⚠️ Местоположение {{ target_person_name }} сейчас неизвестно. ❓"
-                      parse_mode: html
+                      # ФИКС: Используем чистую многострочную строку без HTML-тегов
+                      message: |-
+                        ⚠️ Местоположение {{ target_person_name }} сейчас неизвестно. ❓
+                        Запрошено: {{ sender_name }}
+                      parse_mode: plain_text # Используем plain_text
 
 mode: single

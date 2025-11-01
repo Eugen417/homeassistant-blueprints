@@ -1,4 +1,4 @@
-id: homeassistant_person_tracker_telegram_v1
+id: homeassistant_person_tracker_telegram_v1.1
 
 blueprint:
   name: 🏠 Отслеживание нескольких пользователей, уведомления в Telegram и определение их местоположения 📍

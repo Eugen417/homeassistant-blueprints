@@ -32,7 +32,7 @@ blueprint:
   input:
     # 1. СПИСОК ОТСЛЕЖИВАЕМЫХ PERSON
     tracked_persons:
-      name: 📝Список отслеживаемых пользователей (person.XXX) 🗺️
+      name: 📝𐦂𖨆𐀪𖠋Список отслеживаемых пользователей (person.XXX) 🗺️ # ВОССТАНОВЛЕНО
       description: Выберите person-сущности для отслеживания.
       selector:
         entity:
@@ -41,7 +41,7 @@ blueprint:
           
     # 2. СЕРВИС УВЕДОМЛЕНИЙ TELEGRAM
     telegram_notifications:
-      name: ➤ Сервис уведомлений Telegram (notify.xxx) 🗺️
+      name: ➤ Сервис уведомлений Telegram (notify.xxx) 🗺️ # ВОССТАНОВЛЕНО
       description: Выберите сущность notify, созданную для Telegram-бота.
       selector:
         entity:
@@ -67,7 +67,7 @@ action:
   - variables:
       telegram_notifications_id: !input telegram_notifications
       tracked_persons_ids: !input tracked_persons
-      all_command: "/где_все" # Новая команда для запроса всех
+      all_command: "/где_все" # Команда для запроса всех
       
       # --- АВТОМАТИЧЕСКОЕ ИЗВЛЕЧЕНИЕ ID ЧАТА ИЗ notify.xxx ---
       notify_target_id: >-
@@ -110,7 +110,7 @@ action:
               parse_mode: plain_text
               inline_keyboard:
                 - "Где сейчас {{ triggered_person_name }}? 🗺️:{{ button_command }}"
-                - "Показать всех 🌐:{{ all_command }}" # НОВАЯ КНОПКА
+                - "Показать всех 🌐:{{ all_command }}"
           
       # ВЫБОР 2: Приход домой 🏡
       - conditions:
@@ -231,7 +231,6 @@ action:
                           value_template: "{{ state_attr(target_person_id, 'latitude') is not none }}"
                       sequence:
                         - variables:
-                            # Используем чистую многострочную строку без HTML-тегов
                             status_message: |-
                               {% if is_state(target_person_id, 'home') %}
                                 {{ target_person_name }} дома! 🏡

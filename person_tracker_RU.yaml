@@ -14,6 +14,7 @@ blueprint:
 
     ---
     **ПРИМЕР КОНФИГУРАЦИИ TELEGRAM В configuration.yaml** 🤖
+    (Обязательно замените placeholder-значения на свои!)
     ---
     
     telegram_bot:
@@ -23,8 +24,8 @@ blueprint:
         
         # ✅ ОБЯЗАТЕЛЬНО: Разрешенные ID чатов
         allowed_chat_ids:
-          - -1234567890123 
-          - 987654321
+          - -1234567890123 # ЗАМЕНИТЕ НА ВАШ ID группового чата (для уведомлений)
+          - 987654321 # ЗАМЕНИТЕ НА ВАШ ID вашего личного аккаунта (для колбэков)
           
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/person_tracker_RU.yaml
           
@@ -32,7 +33,7 @@ blueprint:
   input:
     # 1. СПИСОК ОТСЛЕЖИВАЕМЫХ PERSON
     tracked_persons:
-      name: 📝𐦂𖨆𐀪𖠋Список отслеживаемых пользователей (person.XXX) 🗺️ # ВОССТАНОВЛЕНО
+      name: 📝𐦂𖨆𐀪𖠋Список отслеживаемых пользователей (person.XXX) 🗺️ 
       description: Выберите person-сущности для отслеживания.
       selector:
         entity:
@@ -41,7 +42,7 @@ blueprint:
           
     # 2. СЕРВИС УВЕДОМЛЕНИЙ TELEGRAM
     telegram_notifications:
-      name: ➤ Сервис уведомлений Telegram (notify.xxx) 🗺️ # ВОССТАНОВЛЕНО
+      name: ➤ Сервис уведомлений Telegram (notify.xxx) 🗺️ 
       description: Выберите сущность notify, созданную для Telegram-бота.
       selector:
         entity:
@@ -176,7 +177,7 @@ action:
                     data:
                       target: "{{ chat_id_response }}"
                       latitude: "{{ state_attr(target_person_id, 'latitude') }}"
-                      longitude: "{{ state_attr(target_person_id, 'longitude') }}"
+                      longitude: "{{ state_person_id, 'longitude') }}"
                   
               # Если координат НЕТ
               - conditions:

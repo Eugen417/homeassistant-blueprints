@@ -1,5 +1,4 @@
-id: homeassistant_person_tracker_telegram_v1.4
-
+id: homeassistant_person_tracker_telegram_v1.5
 blueprint:
   name: 🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍
   description: |
@@ -24,9 +23,9 @@ blueprint:
           - 987654321 
         allowed_commands:
           - /gde_vse 
-          
+        
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/person_tracker_RU.yaml
-          
+        
   domain: automation
   input:
     # 1. СПИСОК ОТСЛЕЖИВАЕМЫХ PERSON
@@ -192,6 +191,7 @@ action:
           - variables:
               triggered_person_id: "{{ trigger.entity_id }}"
               triggered_person_name: "{{ state_attr(trigger.entity_id, 'friendly_name') | default(trigger.entity_id.split('.')[1]) }}"
+              # Кнопка всегда генерирует правильный ID, включая подчеркивания
               button_command: "/где_{{ trigger.entity_id.split('.')[1] }}"
           
           - service: telegram_bot.send_message
@@ -228,11 +228,12 @@ action:
             id: location_request 
           - condition: template
             value_template: >
-              {% set cmd_part = trigger.event.data.command.split('_')[1] | default('none') | lower %}
-              {{ trigger.event.data.command.startswith('/где_') and 'person.' + cmd_part in tracked_persons_ids }}
+              {% set full_id = trigger.event.data.command | regex_replace(find='/где_', replace='') %}
+              {{ trigger.event.data.command.startswith('/где_') and 'person.' + full_id in tracked_persons_ids }}
         sequence:
           - variables:
-              target_name_id: "{{ trigger.event.data.command.split('_')[1] }}"
+              # ИСПРАВЛЕНИЕ: Используем regex_replace для корректной обработки имен с '_'
+              target_name_id: "{{ trigger.event.data.command | regex_replace(find='/где_', replace='') }}"
               target_person_id: "person.{{ target_name_id }}" 
               target_person_name: "{{ state_attr(target_person_id, 'friendly_name') | default(target_person_id.split('.')[1]) }}"
               chat_id_response: "{{ trigger.event.data.chat_id | int }}"
@@ -263,7 +264,7 @@ action:
                           {{ person_name }} не дома! 🗺️
                         {% endif %}
                         Запрошено: {{ sender_name }}
-                  
+                    
                   - service: telegram_bot.send_message
                     data:
                       target: "{{ chat_id_response }}"
@@ -363,7 +364,7 @@ action:
                             # Используем новую переменную, заменяя {name}
                             message: "{{ phrase_unknown | replace('{name}', target_person_name) }}"
                             parse_mode: plain_text
-      
+          
       # ----------------------------------------------------------------------
       # ВЫБОР 5: Запрос местоположения ВСЕХ пользователей (Command - текст) ⌨️
       # ----------------------------------------------------------------------
@@ -435,3 +436,4 @@ action:
                             parse_mode: plain_text
                         
 mode: parallel
+max: 10

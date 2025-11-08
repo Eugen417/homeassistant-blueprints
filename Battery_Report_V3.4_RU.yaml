@@ -1,7 +1,7 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_7_7_ru # <--- ДОБАВЛЕН УНИКАЛЬНЫЙ ID
+id: automation_otchet_po_sostoianiiu_batarei_v3_7_8_ru
 
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.7.7)
+  name: 🪫 Отчет по состоянию батарей (v3.7.8)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время и дни недели, с указанием типа и количества элементов питания. 
@@ -103,7 +103,7 @@ blueprint:
           step: 1
           unit_of_measurement: "%"
           mode: box
-        
+          
     excluded_sensors:
       name: 🗑️ Исключаемые сенсоры ("Батарея+")
       description: Сенсоры уровня заряда, которые нужно исключить из отчета. Выберите те, которые помечены как **"Батарея+"**.
@@ -115,6 +115,122 @@ blueprint:
             - domain: sensor
               device_class: battery
 
+    # 3. НАСТРОЙКА ТЕКСТА И ФРАЗ
+    text_disposable_header:
+      name: 📝 Заголовок (Краткий отчет - ЗАМЕНА)
+      description: Текст, отображаемый перед списком устройств, требующих замены.
+      default: "⚠️ Устройства, требующие замены батареи:\n"
+      selector:
+        text:
+    text_disposable_action:
+      name: 📝 Шаблон строки (Краткий отчет - ЗАМЕНА)
+      description: Шаблон строки для незаряжаемых батарей. Используйте %LEVEL%, %TYPE%, %QTY%.
+      default: "%LEVEL%% ♻️ ЗАМЕНА! (Тип: %TYPE%, Кол-во: %QTY%)"
+      selector:
+        text:
+    text_disposable_ok:
+      name: 📝 Сообщение (ЗАМЕНА не требуется)
+      description: Текст, когда ни одно устройство не требует замены.
+      default: "Все незаряжаемые батареи имеют заряд выше "
+      selector:
+        text:
+    text_rechargeable_header:
+      name: 📝 Заголовок (Краткий отчет - ЗАРЯДКА)
+      description: Текст, отображаемый перед списком устройств, требующих подзарядки.
+      default: "⚠️ Устройства, требующие подзарядки:\n"
+      selector:
+        text:
+    text_rechargeable_action:
+      name: 📝 Шаблон строки (Краткий отчет - ЗАРЯДКА)
+      description: Шаблон строки для заряжаемых устройств. Используйте %LEVEL%.
+      default: "%LEVEL%% 🔌 ЗАРЯДКА!"
+      selector:
+        text:
+    text_rechargeable_ok:
+      name: 📝 Сообщение (ЗАРЯДКА не требуется)
+      description: Текст, когда ни одно устройство не требует подзарядки.
+      default: "Все заряжаемые устройства имеют заряд выше "
+      selector:
+        text:
+    text_full_replace_label:
+      name: 📝 Метка замены (Полный отчет)
+      description: Метка, отображаемая рядом с низким зарядом незаряжаемых (например, ♻️ ЗАМЕНА!).
+      default: " ♻️ ЗАМЕНА!"
+      selector:
+        text:
+    text_full_charge_label:
+      name: 📝 Метка зарядки (Полный отчет)
+      description: Метка, отображаемая рядом с низким зарядом заряжаемых (например, 🔌 ЗАРЯДКА!).
+      default: " 🔌 ЗАРЯДКА!"
+      selector:
+        text:
+    text_rechargeable_type:
+      name: 📝 Название встроенного АКБ
+      description: Название для типа "Rechargeable" в сводке.
+      default: "Встроеный АКБ"
+      selector:
+        text:
+    text_unknown_type:
+      name: 📝 Название неизвестного типа
+      description: Название для типа "Unknown" в сводке.
+      default: "Неизвестный Тип"
+      selector:
+        text:
+    text_summary_header:
+      name: 📝 Заголовок сводки
+      description: Заголовок для блока сводки по типам батарей.
+      default: "--- \n\n🔋 Сводка по Типу Батареи (Общее количество элементов):\n"
+      selector:
+        text:
+    text_grand_total:
+      name: 📝 Шаблон общего количества
+      description: Шаблон для общего количества элементов. Используйте %TOTAL%.
+      default: "*Общее количество контролируемых элементов:* **%TOTAL%** шт."
+      selector:
+        text:
+    text_no_sensors:
+      name: 📝 Сообщение об отсутствии сенсоров
+      description: Сообщение, если не найдено ни одного сенсора батареи.
+      default: "Сенсоры батарей не найдены."
+      selector:
+        text:
+    text_no_summary_data:
+      name: 📝 Сообщение об отсутствии сводки
+      description: Сообщение, если нет данных для сводки.
+      default: "Нет данных о типах батарей для отчета."
+      selector:
+        text:
+    title_short_replace_low:
+      name: 📱 Заголовок (Краткий, Замена, Низкий)
+      description: Заголовок уведомления, когда требуется замена (Telegram/Мобильное).
+      default: "🔋 Отчёт Батарея+: 🪫♻️ Заряд < "
+      selector:
+        text:
+    title_short_replace_ok:
+      name: 📱 Заголовок (Краткий, Замена, OK)
+      description: Заголовок уведомления, когда замена не требуется.
+      default: "🔋 Отчёт Батарея+: Замена не требуется"
+      selector:
+        text:
+    title_short_charge_low:
+      name: 📱 Заголовок (Краткий, Зарядка, Низкий)
+      description: Заголовок уведомления, когда требуется зарядка (Telegram/Мобильное).
+      default: "🔋 Отчёт Батарея+: 🪫🔌 Заряд < "
+      selector:
+        text:
+    title_short_charge_ok:
+      name: 📱 Заголовок (Краткий, Зарядка, OK)
+      description: Заголовок уведомления, когда зарядка не требуется.
+      default: "🔋Отчёт Батарея+: Зарядка не требуется"
+      selector:
+        text:
+    title_full_report:
+      name: 📊 Заголовок (Полный отчет)
+      description: Заголовок для полного списка всех батарей.
+      default: "🔋 *Полный отчет Батарея+ (Отсортирован по уровню):*"
+      selector:
+        text:
+
 variables:
   mobile_device_id: !input mobile_notify_target
   telegram_notify_entities: !input telegram_notify_target 
@@ -123,6 +239,26 @@ variables:
   send_full_report: !input send_full_report_option
   full_report_days: !input full_report_days 
   trigger_days: !input trigger_days
+  # Text variables
+  text_disposable_header: !input text_disposable_header
+  text_disposable_action: !input text_disposable_action
+  text_disposable_ok: !input text_disposable_ok
+  text_rechargeable_header: !input text_rechargeable_header
+  text_rechargeable_action: !input text_rechargeable_action
+  text_rechargeable_ok: !input text_rechargeable_ok
+  text_full_replace_label: !input text_full_replace_label
+  text_full_charge_label: !input text_full_charge_label
+  text_rechargeable_type: !input text_rechargeable_type
+  text_unknown_type: !input text_unknown_type
+  text_summary_header: !input text_summary_header
+  text_grand_total: !input text_grand_total
+  text_no_sensors: !input text_no_sensors
+  text_no_summary_data: !input text_no_summary_data
+  title_short_replace_low: !input title_short_replace_low
+  title_short_replace_ok: !input title_short_replace_ok
+  title_short_charge_low: !input title_short_charge_low
+  title_short_charge_ok: !input title_short_charge_ok
+  title_full_report: !input title_full_report
 
 trigger:
   - platform: time
@@ -151,7 +287,9 @@ action:
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% ♻️ ЗАМЕНА! (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ ")" %}
+                {# Использование настраиваемой строки #}
+                {% set line_action = text_disposable_action | replace('%LEVEL%', numerical_level | string) | replace('%TYPE%', battery_type | string) | replace('%QTY%', battery_quantity | string) %}
+                {% set line = cleaned_name ~ ": " ~ line_action %}
                 {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -160,10 +298,9 @@ action:
         {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %}
         {% set disposable_output = sorted_disposable | map(attribute='line') | list %}
         {% if disposable_output | length > 0 %}
-          {{ "⚠️ Устройства, требующие замены батареи:\n" ~ disposable_output | join('\n') }}
+          {{ text_disposable_header ~ disposable_output | join('\n') }}
         {% else %}
-          {# ИСПРАВЛЕНИЕ v3.7.3: Убрана избыточная префикса "✅♻️ ️ЗАМЕНА НЕ ТРЕБУЕТСЯ" #}
-          {{ "Все незаряжаемые батареи имеют заряд выше " ~ critical_threshold ~ "%." }}
+          {{ text_disposable_ok ~ critical_threshold ~ "%." }}
         {% endif %}
 
       # Сообщение о заряжаемых устройствах (Зарядка) - КРАТКИЙ ОТЧЕТ 2
@@ -179,7 +316,9 @@ action:
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if is_rechargeable %}
-                {% set line = cleaned_name ~ ": " ~ numerical_level ~ "% 🔌 ЗАРЯДКА!" %}
+                {# Использование настраиваемой строки #}
+                {% set line_action = text_rechargeable_action | replace('%LEVEL%', numerical_level | string) %}
+                {% set line = cleaned_name ~ ": " ~ line_action %}
                 {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -188,10 +327,9 @@ action:
         {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %}
         {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %}
         {% if rechargeable_output | length > 0 %}
-          {{ "⚠️ Устройства, требующие подзарядки:\n" ~ rechargeable_output | join('\n') }}
+          {{ text_rechargeable_header ~ rechargeable_output | join('\n') }}
         {% else %}
-          {# ИСПРАВЛЕНИЕ v3.7.3: Убрана избыточная префикса "✅🔌 ЗАРЯДКА НЕ ТРЕБУЕТСЯ" #}
-          {{ "Все заряжаемые устройства имеют заряд выше " ~ critical_threshold ~ "%." }}
+          {{ text_rechargeable_ok ~ critical_threshold ~ "%." }}
         {% endif %}
       
       # ОТЧЕТ 3: ПОЛНЫЙ СПИСОК ВСЕХ БАТАРЕЙ (ТЕЛО СООБЩЕНИЯ С ДЕТАЛЯМИ)
@@ -211,7 +349,7 @@ action:
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               
-              {# 1. ОПРЕДЕЛЕНИЕ ЦВЕТОВОГО СТАТУСА (На основе фиксированных порогов 15/40) #}
+              {# 1. ОПРЕДЕЛЕНИЕ ЦВЕТОВОГО СТАТУСА #}
               {% set status_icon = '🟢' %} 
               {% if numerical_level < red_boundary %}
                 {% set status_icon = '🔴' %} 
@@ -222,13 +360,15 @@ action:
               {# 2. ОПРЕДЕЛЕНИЕ ТЕКСТОВОЙ МЕТКИ АВАРИИ (На основе пользовательского critical_threshold) #}
               {% set status_label = '' %}
               {% if numerical_level < threshold %}
-                {% set status_label = '♻️ ЗАМЕНА!' if not is_rechargeable else ' 🔌 ЗАРЯДКА!' %}
+                {# Использование настраиваемых меток #}
+                {% set status_label = text_full_replace_label if not is_rechargeable else text_full_charge_label %}
               {% endif %}
               
               {# ДОБАВЛЕНИЕ ДЕТАЛЕЙ ТОЛЬКО ДЛЯ незаряжаемых #}
               {% set details = "" %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
+                {# Детали не полностью настраиваемые, но используют переменные #}
                 {% set details = " (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ " шт)" %}
               {% endif %}
 
@@ -243,7 +383,7 @@ action:
         {% if all_output | length > 0 %}
           {{ all_output | join('\n') }}
         {% else %}
-          Сенсоры батарей не найдены.
+          {{ text_no_sensors }}
         {% endif %}
         
       # ОТЧЕТ 4: СВОДКА ПО ТИПУ БАТАРЕИ (Общее количество элементов)
@@ -265,10 +405,10 @@ action:
             {% set total_quantity.value = total_quantity.value + quantity %}
           {% endfor %}
 
-          {# Замена "Rechargeable" на "Встроеный АКБ" для отображения #}
-          {% set display_type = type | default('Неизвестный Тип') | string %}
+          {# Использование настраиваемых имен типов #}
+          {% set display_type = type | default(text_unknown_type) | string %}
           {% if display_type == 'Rechargeable' %}
-            {% set display_type = 'Встроеный АКБ' %}
+            {% set display_type = text_rechargeable_type %}
           {% endif %}
 
           {# Форматированная строка: • [Тип] (Всего: [Количество] шт) #}
@@ -277,10 +417,29 @@ action:
         {% endfor %}
         
         {% if ns.output_lines | length > 0 %}
-          {{ "--- \n\n🔋 Сводка по Типу Батареи (Общее количество элементов):\n" ~ ns.output_lines | sort | join('\n') }}
+          {{ text_summary_header ~ ns.output_lines | sort | join('\n') }}
         {% else %}
-          Нет данных о типах батарей для отчета.
+          {{ text_no_summary_data }}
         {% endif %}
+
+      # Добавлена глобальная переменная для общего кол-ва
+      grand_total_quantity: >-
+        {% set total = namespace(value=0) %}
+        {% set exclude_list_local = excluded_entity_ids.entity_id | default([]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list_local %}
+            {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %}
+            {% set total.value = total.value + quantity %}
+          {% endif %}
+        {% endfor %}
+        {{ total.value }}
+        
+      # ИСПРАВЛЕНИЕ СТРУКТУРЫ: Перемещение вычисления Полного отчета в главный блок variables
+      full_report_message: >
+        {% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %}
+        {% set header = title_full_report %}
+        {{ total_text ~ '\n' ~ header ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}
+
 
   # ----------------------------------------------------------------------
   # 2. ОТПРАВКА ОТЧЕТА 1: НЕЗАРЯЖАЕМЫЕ (ЗАМЕНА)
@@ -307,12 +466,12 @@ action:
                 sequence:
                   - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
-                      # Динамический заголовок для мобильного приложения
+                      # Динамический заголовок для мобильного приложения (использование настраиваемого заголовка)
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          🔋 Отчёт Батарея+: 🪫♻️ Заряд < {{ critical_threshold }}%
+                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
                         {% else %}
-                          🔋 Отчёт Батарея+: Замена не требуется
+                          {{ title_short_replace_ok }}
                         {% endif %}
                       message: "{{ disposable_message }}"
           
@@ -321,12 +480,10 @@ action:
             variables:
               # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
               target_chat_ids: >-
-                {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
                 {# 1. Получаем сырые данные #}
                 {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
                 {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
                 {% set selected_entities = [selected_entities_raw] | flatten %}
-                {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
                 
                 {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
                 {% set ns = namespace(target_ids=[]) %}
@@ -353,22 +510,22 @@ action:
                       target: "{{ target_chat_ids }}" # ID чатов с корректно добавленным минусом
                       message: |
                         {% set report_body = disposable_message %}
-                        
-                        {# Form the header with Markdown formatting #}
+                          
+                        {# Form the header with Markdown formatting (использование настраиваемого заголовка) #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔋 *Отчёт Батарея+:* 🪫♻️ Заряд < ' ~ critical_threshold ~ '%' %}
+                          {% set header = title_short_replace_low ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '🔋 *Отчёт Батарея+:* Замена не требуется' %}
+                          {% set header = title_short_replace_ok %}
                         {% endif %}
-                        
+                          
                         {% set final_message = header ~ "\n\n" ~ report_body %}
-                        
+                          
                         {# Полное экранирование спецсимволов MarkdownV2. #}
-                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
-                        
+                        {% set escaped_message = final_message | replace('\\', '\\\\') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                          
                         {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
                         {% set restored_bold_message = escaped_message | replace('\*', '*', 2) %}
-                        
+                          
                         {{ restored_bold_message }}
                       parse_mode: markdownv2
   
@@ -397,12 +554,12 @@ action:
                 sequence:
                   - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
-                      # Динамический заголовок для мобильного приложения
+                      # Динамический заголовок для мобильного приложения (использование настраиваемого заголовка)
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          🔋 Отчёт Батарея+: 🪫🔌 Заряд < {{ critical_threshold }}%
+                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
                         {% else %}
-                          🔋Отчёт Батарея+: Зарядка не требуется
+                          {{ title_short_charge_ok }}
                         {% endif %}
                       message: "{{ rechargeable_message }}"
           
@@ -411,13 +568,8 @@ action:
             variables:
               # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
               target_chat_ids: >-
-                {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
-                {# 1. Получаем сырые данные #}
                 {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
-                {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
                 {% set selected_entities = [selected_entities_raw] | flatten %}
-                {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
-                
                 {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
                 {% set ns = namespace(target_ids=[]) %}
                 {% for id_string in chat_id_strings %}
@@ -442,22 +594,22 @@ action:
                       target: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = rechargeable_message %}
-                        
-                        {# Form the header with Markdown formatting #}
+                          
+                        {# Form the header with Markdown formatting (использование настраиваемого заголовка) #}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '🔋 *Отчёт Батарея+:* 🪫🔌 Заряд < ' ~ critical_threshold ~ '%' %}
+                          {% set header = title_short_charge_low ~ critical_threshold ~ '%' %}
                         {% else %}
-                          {% set header = '*🔋 Отчёт Батарея+:* Зарядка не требуется' %}
+                          {% set header = title_short_charge_ok %}
                         {% endif %}
-                        
+                          
                         {% set final_message = header ~ "\n\n" ~ report_body %}
-                        
+                          
                         {# Полное экранирование спецсимволов MarkdownV2. #}
-                        {% set escaped_message = final_message | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
-                        
+                        {% set escaped_message = final_message | replace('\\', '\\\\') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                          
                         {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
                         {% set restored_bold_message = escaped_message | replace('\*', '*', 2) %}
-                        
+                          
                         {{ restored_bold_message }}
                       parse_mode: markdownv2
   
@@ -468,13 +620,8 @@ action:
     variables:
       # ИЗВЛЕЧЕНИЕ ID и ДОБАВЛЕНИЕ МИНУСА ДЛЯ ДЛИННЫХ ID (ГРУПП/КАНАЛОВ)
       target_chat_ids: >-
-        {# *** ИСПРАВЛЕНИЕ НАЧАЛО *** #}
-        {# 1. Получаем сырые данные #}
         {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
-        {# 2. Гарантируем, что это всегда список, используя [ ] | flatten #}
         {% set selected_entities = [selected_entities_raw] | flatten %}
-        {# *** ИСПРАВЛЕНИЕ КОНЕЦ *** #}
-        
         {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
         {% set ns = namespace(target_ids=[]) %}
         {% for id_string in chat_id_strings %}
@@ -502,19 +649,15 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          - variables:
-              # Title for the Full report (with full escaping)
-              full_report_title: "🔋 *Полный отчет Батарея+ (Отсортирован по уровню):*"
-              # Add battery type summary to the message
-              full_report_message: "{{ full_report_title ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary }}"
-            
+          # ИСПРАВЛЕНИЕ: Удален лишний блок variables, full_report_message уже определена в action/1
           - service: telegram_bot.send_message
             data:
               target: "{{ target_chat_ids }}" 
               message: |
                 {% set report_body = full_report_message %}
-                {# Полное экранирование спецсимволов MarkdownV2. Восстанавливаем звездочки для заголовка. #}
-                {% set escaped_body = report_body | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
+                
+                {# ИСПРАВЛЕНИЕ: Добавлено экранирование обратной косой черты (`\`) первым, чтобы избежать проблем с символами MarkdownV2. #}
+                {% set escaped_body = report_body | replace('\\', '\\\\') | replace('~', '\~') | replace('`', '\`') | replace('>', '\>') | replace('#', '\#') | replace('+', '\+') | replace('-', '\-') | replace('=', '\=') | replace('|', '\|') | replace('{', '\{') | replace('}', '\}') | replace('.', '\.') | replace('!', '\!') | replace('*', '\*') | replace('_', '\_') | replace('[', '\[') | replace(']', '\]') | replace('(', '\(') | replace(')', '\)') | replace('%', '\%') | replace('&', '\&') %}
                 
                 {# Восстанавливаем звездочки для заголовка. Предполагаем, что они используются только для выделения жирным в заголовке (2 шт). #}
                 {% set restored_bold_message = escaped_body | replace('\*', '*', 2) %}

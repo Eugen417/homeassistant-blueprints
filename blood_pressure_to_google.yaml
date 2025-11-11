@@ -1,0 +1,191 @@
+blueprint: 
+  name: 🩸 Запись артериального давления в Google + Telegram
+  description: Автоматически записывает АД и пульс в Google Calendar/Sheets И отправляет уведомление в Telegram.
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/blood_pressure_to_google.yaml
+  
+  input:
+    # 1. СЕНСОРЫ
+    sensor_systolic:
+      name: 📈 Сенсор систолического АД (SYS и Триггер)
+      description: Сенсор, содержащий верхнее (SYS) давление. Изменение этого сенсора запускает автоматизацию.
+      selector:
+        entity:
+          domain: sensor
+          
+    sensor_diastolic:
+      name: 📉 Сенсор диастолического АД (DIA)
+      description: Сенсор, содержащий нижнее (DIA) давление.
+      selector:
+        entity:
+          domain: sensor
+
+    sensor_heart_rate:
+      name: ❤️ Сенсор пульса
+      description: Сенсор, содержащий частоту пульса.
+      selector:
+        entity:
+          domain: sensor
+
+    # 2. GOOGLE CALENDAR
+    google_calendar:
+      name: 📅 Google Calendar (Необязательно)
+      description: Выберите календарь Google для записи событий. **Оставьте пустым, если не нужно.**
+      default: null 
+      selector:
+        entity:
+          domain: calendar
+
+    # 3. GOOGLE SHEETS
+    google_sheets_config:
+      name: 📑 Google Sheets (Конфигурация)
+      description: Выберите конфигурацию (ID) вашей таблицы Google Sheets.
+      selector:
+        select:
+          options: []
+          multiple: false
+          custom_value: true
+          
+    google_sheets_worksheet:
+      name: 📝 Имя листа в таблице
+      description: Точное имя листа/вкладки в вашей Google Sheets (например, "Лист1").
+      selector:
+        text:
+
+    # 4. TELEGRAM
+    telegram_notify_target:
+      name: 💬 Целевое уведомление Telegram
+      description: Выберите *Цель* (Target) Telegram для отправки сообщения.
+      selector:
+        target:
+          entity:
+            - domain: notify
+            
+    sheets_link:
+      name: 🔗 Ссылка на Google Sheets
+      description: URL-адрес вашей таблицы Google Sheets для включения в сообщение Telegram.
+      selector:
+        text:
+
+# =======================================================================
+# АВТОМАТИЗАЦИЯ
+# =======================================================================
+trigger:
+  - platform: state
+    entity_id: !input sensor_systolic
+    
+condition:
+  # Проверка SYS > 50 для предотвращения дублирования
+  - condition: numeric_state
+    entity_id: !input sensor_systolic
+    above: 50 
+
+action:
+  # 0. ОПРЕДЕЛЕНИЕ ПЕРЕМЕННЫХ
+  - variables:
+      input_sensor_systolic: !input sensor_systolic
+      input_sensor_diastolic: !input sensor_diastolic
+      input_sensor_heart_rate: !input sensor_heart_rate
+      input_google_calendar: !input google_calendar 
+      input_telegram_target: !input telegram_notify_target
+      input_sheets_link: !input sheets_link
+      
+      sys: "{{ states(input_sensor_systolic) | int(0) }}"
+      dia: "{{ states(input_sensor_diastolic) | int(0) }}"
+      pulse: "{{ states(input_sensor_heart_rate) | int(0) }}"
+      
+      time_str: "{{ now().strftime('%H:%M') }}"
+      date_str: "{{ now().strftime('%Y-%m-%d') }}"
+      
+      # БЛОК TELEGRAM CHAT ID
+      telegram_chat_id_str: >-
+        {% set target_entity_id = input_telegram_target.get('entity_id', ['']) | first | default('') %}
+        
+        {% set final_id = '' %}
+        {% if target_entity_id %}
+          {# Логика извлечения Chat ID из имени сущности notify.telegram_bot_ID #}
+          {% set chat_id_part = target_entity_id | regex_replace(find='^.+_', replace='') | string | trim %}
+          {% set final_id = chat_id_part %}
+          
+          {# Возвращаем логику для групповых чатов, добавляем "-" #}
+          {% if final_id | length > 10 and not final_id.startswith('-') %}
+            {% set final_id = '-' ~ final_id %}
+          {% endif %}
+        {% endif %}
+        {{ final_id }}
+        
+  # 1. ЗАПИСЬ В GOOGLE CALENDAR (УСЛОВНОЕ ВЫПОЛНЕНИЕ)
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ input_google_calendar is not none }}"
+        sequence:
+          - service: calendar.create_event
+            data:
+              start_date_time: "{{ now().isoformat() }}"
+              end_date_time: "{{ (now() + timedelta(minutes=1)).isoformat() }}"
+              summary: "Дав: {{ sys }} / {{ dia }}, Пульс {{ pulse }} | {{ time_str }}"
+            target:
+              entity_id: !input google_calendar
+
+  # 2. ЗАПИСЬ В GOOGLE SHEETS
+  - service: google_sheets.append_sheet
+    data:
+      config_entry: !input google_sheets_config
+      worksheet: !input google_sheets_worksheet
+      data:
+        Год: "{{ now().strftime('%Y') }}"
+        Число: "{{ now().strftime('%-d') }}"
+        Месяц: >
+          {% set month_num = now().month %}
+          {% if month_num == 1 %}Январь
+          {% elif month_num == 2 %}Февраль
+          {% elif month_num == 3 %}Март
+          {% elif month_num == 4 %}Апрель
+          {% elif month_num == 5 %}Май
+          {% elif month_num == 6 %}Июнь
+          {% elif month_num == 7 %}Июль
+          {% elif month_num == 8 %}Август
+          {% elif month_num == 9 %}Сентябрь
+          {% elif month_num == 10 %}Октябрь
+          {% elif month_num == 11 %}Ноябрь
+          {% else %}Декабрь{% endif %}
+        День недели: >
+          {% set weekday_num = now().weekday() %}
+          {% if weekday_num == 0 %}Понедельник
+          {% elif weekday_num == 1 %}Вторник
+          {% elif weekday_num == 2 %}Среда
+          {% elif weekday_num == 3 %}Четверг
+          {% elif weekday_num == 4 %}Пятница
+          {% elif weekday_num == 5 %}Суббота
+          {% else %}Воскресенье{% endif %}
+        Период дня: >
+          {% set hour = now().hour %}
+          {% if hour >= 6 and hour < 12 %}Утро
+          {% elif hour >= 12 and hour < 18 %}День
+          {% elif hour >= 18 and hour < 23 %}Вечер
+          {% else %}Ночь{% endif %}
+        Время: "{{ time_str }}"
+        SYS: "{{ sys | float(0) }}"
+        DIA: "{{ dia | float(0) }}"
+        Пульс: "{{ pulse | float(0) }}"
+
+  # 3. ОТПРАВКА В TELEGRAM (Оптимизация форматирования сообщения)
+  - service: telegram_bot.send_message
+    metadata: {}
+    data:
+      chat_id: "{{ telegram_chat_id_str }}"
+      
+      message: |
+        📊 Новое измерение артериального давления
+        
+        Время: {{ date_str }} в {{ time_str }}
+        Давление: {{ sys }} / {{ dia }} mmHg
+        Пульс: {{ pulse }} bpm
+        {% if input_sheets_link | length > 0 %}
+        🔗 <a href="{{ input_sheets_link }}">История измерений</a>
+        {% endif %}
+      parse_mode: html
+        
+mode: single

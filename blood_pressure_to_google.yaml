@@ -96,7 +96,7 @@ action:
       pulse: "{{ states(input_sensor_heart_rate) | int(0) }}"
       
       time_str: "{{ now().strftime('%H:%M') }}"
-      date_str: "{{ now().strftime('%Y-%m-%d') }}"
+      date_str: "{{ now().strftime('%d-%m-%Y') }}" # <--- ИЗМЕНЕН ФОРМАТ ДАТЫ
       
       # БЛОК TELEGRAM CHAT ID
       telegram_chat_id_str: >-
@@ -125,7 +125,8 @@ action:
             data:
               start_date_time: "{{ now().isoformat() }}"
               end_date_time: "{{ (now() + timedelta(minutes=1)).isoformat() }}"
-              summary: "Дав: {{ sys }} / {{ dia }}, Пульс {{ pulse }} | {{ time_str }}"
+              # Здесь также используется новый формат даты, чтобы соответствовать общему стилю:
+              summary: "Дав: {{ sys }} / {{ dia }}, Пульс {{ pulse }} | {{ now().strftime('%d.%m %H:%M') }}"
             target:
               entity_id: !input google_calendar
 
@@ -175,14 +176,14 @@ action:
   - service: telegram_bot.send_message
     metadata: {}
     data:
-      chat_id: "{{ telegram_chat_id_str }}"
-      
+      chat_id: "{{ telegram_chat_id_str }}" 
       message: |
         📊 Новое измерение артериального давления
         
         Время: {{ date_str }} в {{ time_str }}
         Давление: {{ sys }} / {{ dia }} mmHg
         Пульс: {{ pulse }} bpm
+        
         {% if input_sheets_link | length > 0 %}
         🔗 <a href="{{ input_sheets_link }}">История измерений</a>
         {% endif %}

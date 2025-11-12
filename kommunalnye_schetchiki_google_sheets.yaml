@@ -1,0 +1,330 @@
+blueprint: 
+  name: 📄 Запись коммунальных расходов в Google Sheets + Telegram
+  description: 'Ежемесячно (в выбранный день) записывает показания счетчиков ХВС, ГВС, Электроэнергии, Газа и Тепла за **предыдущий месяц** в Google Sheets и отправляет уведомление в Telegram. Запуск всегда происходит в 00:00:01.'
+  domain: automation
+  
+  input:
+    # 1. СЕНСОРЫ СЧЕТЧИКОВ И ИХ НОМЕРА
+    
+    sensor_hvs_1:
+      name: 💧 ХВС 1 (Сенсор)
+      description: 'Выберите сенсор счетчика ХВС 1. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_hvs_1:
+      name: Название счетчика ХВС 1 (для Telegram)
+      description: 'Введите название счетчика (например, 6-8 цифр). По умолчанию - ХВС 1.'
+      default: "ХВС 1"
+      selector:
+        text:
+
+    sensor_hvs_2:
+      name: 💧 ХВС 2 (Сенсор)
+      description: 'Выберите сенсор счетчика ХВС 2. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_hvs_2:
+      name: Название счетчика ХВС 2 (для Telegram)
+      description: 'Введите название счетчика (например, 6-8 цифр). По умолчанию - ХВС 2.'
+      default: "ХВС 2"
+      selector:
+        text:
+
+    sensor_gvs_1:
+      name: 🩸 ГВС 1 (Сенсор)
+      description: 'Выберите сенсор счетчика ГВС 1. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_gvs_1:
+      name: Название счетчика ГВС 1 (для Telegram)
+      description: 'Введите название счетчика (например, 6-8 цифр). По умолчанию - ГВС 1.'
+      default: "ГВС 1"
+      selector:
+        text:
+
+    sensor_gvs_2:
+      name: 🩸 ГВС 2 (Сенсор)
+      description: 'Выберите сенсор счетчика ГВС 2. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_gvs_2:
+      name: Название счетчика ГВС 2 (для Telegram)
+      description: 'Введите название счетчика (например, 6-8 цифр). По умолчанию - ГВС 2.'
+      default: "ГВС 2"
+      selector:
+        text:
+
+    sensor_t1:
+      name: ⚡ Электричество T1 (Сенсор)
+      description: 'Выберите сенсор счетчика Электроэнергии (Тариф 1).'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_t1:
+      name: Название счетчика T1 (для Telegram)
+      description: 'Введите название счетчика. По умолчанию - Электричество T1.'
+      default: "Электричество T1"
+      selector:
+        text:
+
+    sensor_t2:
+      name: ⚡ Электричество T2 (Сенсор)
+      description: 'Выберите сенсор счетчика Электроэнергии (Тариф 2).'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_t2:
+      name: Название счетчика T2 (для Telegram)
+      description: 'Введите название счетчика. По умолчанию - Электричество T2.'
+      default: "Электричество T2"
+      selector:
+        text:
+
+    sensor_t3:
+      name: ⚡ Электричество T3 (Сенсор)
+      description: 'Выберите сенсор счетчика Электроэнергии (Тариф 3).'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_t3:
+      name: Название счетчика T3 (для Telegram)
+      description: 'Введите название счетчика. По умолчанию - Электричество T3.'
+      default: "Электричество T3"
+      selector:
+        text:
+
+    sensor_gas:
+      name: ♨️ Газ (Сенсор)
+      description: 'Выберите сенсор счетчика Газа. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_gas:
+      name: Название счетчика Газа (для Telegram)
+      description: 'Введите название счетчика. По умолчанию - Газ.'
+      default: "Газ"
+      selector:
+        text:
+
+    sensor_heat:
+      name: 🌡️ Тепло (Сенсор)
+      description: 'Выберите сенсор счетчика Тепла. Оставьте пустым, если не нужен.'
+      default: null
+      selector:
+        entity:
+          domain: sensor
+    meter_number_heat:
+      name: Название счетчика Тепла (для Telegram)
+      description: 'Введите название счетчика. По умолчанию - Тепло.'
+      default: "Тепло"
+      selector:
+        text:
+
+    # 4. НАСТРОЙКИ ЗАПУСКА
+    execution_day:
+      name: 📅 День месяца для запуска
+      description: 'Выберите день месяца (1-31), когда будет выполняться запись показаний. Если в месяце нет такого дня (например, 31 февраля), запуск произойдет в последний день месяца.'
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 31
+          mode: box
+
+    # 2. НАСТРОЙКИ GOOGLE SHEETS
+    google_sheets_config:
+      name: 📑 Google Sheets (Конфигурация)
+      description: 'Выберите конфигурацию (ID) вашей таблицы Google Sheets.'
+      selector:
+        select:
+          options: []
+          multiple: false
+          custom_value: true
+          
+    google_sheets_worksheet:
+      name: 📝 Имя листа в таблице
+      description: 'Точное имя листа/вкладки (например, "Учет коммунальных расходов").'
+      selector:
+        text:
+            
+    # 3. TELEGRAM (Необязательно)
+    telegram_notify_target:
+      name: 💬 Целевое уведомление Telegram (Необязательно)
+      description: 'Выберите *Цель* (Target) Telegram для отправки сообщения.'
+      default: null
+      selector:
+        target:
+          entity:
+            - domain: notify
+            
+    sheets_link:
+      name: 🔗 Ссылка на Google Sheets (Необязательно)
+      description: 'URL-адрес вашей таблицы Google Sheets для включения в сообщение Telegram.'
+      default: ""
+      selector:
+        text:
+
+# =======================================================================
+# АВТОМАТИЗАЦИЯ
+# =======================================================================
+trigger:
+  # 1. ТРИГГЕР: Срабатывает каждый день в 00:00:01
+  - platform: time
+    at: "00:00:01"
+
+condition:
+  # 2. УСЛОВИЕ: Проверяет, что текущий день месяца равен выбранному дню,
+  # ИЛИ что выбранный день слишком большой, но сегодня последний день месяца.
+  - condition: template
+    value_template: >
+      {# Определяем переменную input_execution_day, чтобы использовать ее в шаблоне #}
+      {% set chosen_day = input_execution_day | int(1) %}
+      {% set current_day = now().day %}
+      {# Вычисляем последний день текущего месяца #}
+      {% set last_day_of_month = (now() + timedelta(days=1)).replace(day=1) - timedelta(days=1) %}
+
+      {{ current_day == chosen_day or (chosen_day > last_day_of_month.day and current_day == last_day_of_month.day) }}
+    
+action:
+  # 0. ОПРЕДЕЛЕНИЕ ПЕРЕМЕННЫХ
+  - variables:
+      # 1. Определяем все входные данные как переменные
+      input_sensor_hvs_1: !input sensor_hvs_1
+      input_sensor_hvs_2: !input sensor_hvs_2
+      input_sensor_gvs_1: !input sensor_gvs_1
+      input_sensor_gvs_2: !input sensor_gvs_2
+      input_sensor_t1: !input sensor_t1
+      input_sensor_t2: !input sensor_t2
+      input_sensor_t3: !input sensor_t3
+      input_sensor_gas: !input sensor_gas
+      input_sensor_heat: !input sensor_heat
+      
+      input_meter_number_hvs_1: !input meter_number_hvs_1
+      input_meter_number_hvs_2: !input meter_number_hvs_2
+      input_meter_number_gvs_1: !input meter_number_gvs_1
+      input_meter_number_gvs_2: !input meter_number_gvs_2
+      input_meter_number_t1: !input meter_number_t1
+      input_meter_number_t2: !input meter_number_t2
+      input_meter_number_t3: !input meter_number_t3
+      input_meter_number_gas: !input meter_number_gas
+      input_meter_number_heat: !input meter_number_heat
+      
+      input_google_sheets_config: !input google_sheets_config
+      input_google_sheets_worksheet: !input google_sheets_worksheet
+      input_telegram_target: !input telegram_notify_target
+      input_sheets_link: !input sheets_link
+      
+      input_execution_day: !input execution_day # НОВОЕ: Переменная для дня запуска
+      
+      # 2. Вычисляем значения счетчиков
+      # ХВС
+      hvs1: "{{ states(input_sensor_hvs_1) | float(0) if input_sensor_hvs_1 is not none else '' }}"
+      hvs2: "{{ states(input_sensor_hvs_2) | float(0) if input_sensor_hvs_2 is not none else '' }}"
+      
+      # ГВС
+      gvs1: "{{ states(input_sensor_gvs_1) | float(0) if input_sensor_gvs_1 is not none else '' }}"
+      gvs2: "{{ states(input_sensor_gvs_2) | float(0) if input_sensor_gvs_2 is not none else '' }}"
+      
+      # Электричество
+      t1: "{{ states(input_sensor_t1) | float(0) if input_sensor_t1 is not none else '' }}"
+      t2: "{{ states(input_sensor_t2) | float(0) if input_sensor_t2 is not none else '' }}"
+      t3: "{{ states(input_sensor_t3) | float(0) if input_sensor_t3 is not none else '' }}"
+      
+      # Прочее
+      gas: "{{ states(input_sensor_gas) | float(0) if input_sensor_gas is not none else '' }}"
+      heat: "{{ states(input_sensor_heat) | float(0) if input_sensor_heat is not none else '' }}"
+      
+      # Дата и время (Показания берутся за ПРЕДЫДУЩИЙ день)
+      current_year: "{{ (now() - timedelta(days=1)).strftime('%Y') }}"
+      current_day: "{{ (now() - timedelta(days=1)).strftime('%d') }}"
+      current_month_name: >
+        {% set dt = now() - timedelta(days=1) %}
+        {% set month_num = dt.month %}
+        {% if month_num == 1 %}Январь
+        {% elif month_num == 2 %}Февраль
+        {% elif month_num == 3 %}Март
+        {% elif month_num == 4 %}Апрель
+        {% elif month_num == 5 %}Май
+        {% elif month_num == 6 %}Июнь
+        {% elif month_num == 7 %}Июль
+        {% elif month_num == 8 %}Август
+        {% elif month_num == 9 %}Сентябрь
+        {% elif month_num == 10 %}Октябрь
+        {% elif month_num == 11 %}Ноябрь
+        {% else %}Декабрь{% endif %}
+      
+      # БЛОК TELEGRAM CHAT ID
+      telegram_chat_id_str: >-
+        {% set target_entity_id = input_telegram_target.get('entity_id', ['']) | first | default('') %}
+        {% set final_id = '' %}
+        {% if target_entity_id %}
+          {% set chat_id_part = target_entity_id | regex_replace(find='^.+_', replace='') | string | trim %}
+          {% set final_id = chat_id_part %}
+          {% if final_id | length > 10 and not final_id.startswith('-') %}
+            {% set final_id = '-' ~ final_id %}
+          {% endif %}
+        {% endif %}
+        {{ final_id }}
+        
+  # 1. ЗАПИСЬ В GOOGLE SHEETS
+  - service: google_sheets.append_sheet
+    data:
+      config_entry: !input google_sheets_config
+      worksheet: !input google_sheets_worksheet
+      data:
+        Год: "{{ current_year }}"
+        Месяц: "{{ current_month_name }}"
+        ХВС 1: "{{ hvs1 }}"
+        ХВС 2: "{{ hvs2 }}"
+        ГВС 1: "{{ gvs1 }}"
+        ГВС 2: "{{ gvs2 }}"
+        Т1: "{{ t1 }}"
+        Т2: "{{ t2 }}"
+        Т3: "{{ t3 }}"
+        Газ: "{{ gas }}"
+        Тепло: "{{ heat }}"
+
+  # 2. ОТПРАВКА В TELEGRAM
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ telegram_chat_id_str | length > 0 }}"
+        sequence:
+          - service: telegram_bot.send_message
+            metadata: {}
+            data:
+              chat_id: "{{ telegram_chat_id_str }}" 
+              message: |
+                ✅ Коммунальные расходы записаны
+                
+                📄 Показания счетчиков отправлены в Google Sheets.
+                {{ current_day }} {{ current_month_name }} {{ current_year }}
+                Отправленные данные:
+                
+                💧 {{ input_meter_number_hvs_1 }}: {{ hvs1 or '---' }}
+                💧 {{ input_meter_number_hvs_2 }}: {{ hvs2 or '---' }}
+                🩸 {{ input_meter_number_gvs_1 }}: {{ gvs1 or '---' }}
+                🩸 {{ input_meter_number_gvs_2 }}: {{ gvs2 or '---' }}
+                ⚡ {{ input_meter_number_t1 }}: {{ t1 or '---' }}
+                ⚡ {{ input_meter_number_t2 }}: {{ t2 or '---' }}
+                ⚡ {{ input_meter_number_t3 }}: {{ t3 or '---' }}
+                ♨️ {{ input_meter_number_gas }}: {{ gas or '---' }}
+                🌡️ {{ input_meter_number_heat }}: {{ heat or '---' }}
+                {% if input_sheets_link | length > 0 %}
+                🔗 <a href="{{ input_sheets_link }}">Открыть таблицу расходов</a>
+                {% endif %}
+              parse_mode: html
+        
+mode: single

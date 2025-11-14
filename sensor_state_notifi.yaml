@@ -1,0 +1,176 @@
+blueprint:
+  name: 📊 Периодический Отчет (ВСЕ классы) # ИЗМЕНЕНО
+  description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notifi.yaml 
+  
+  input:
+    report_interval_pattern:
+      name: Интервал отчета (например, /5)
+      description: Введите интервал в минутах в формате /N (например, /5 для каждых 5 минут).
+      default: "/30" 
+      selector:
+        text:
+          type: text
+          
+    target_device_class:
+      name: Класс устройства для сканирования (device_class)
+      description: Выберите класс устройств для отчета.
+      default: temperature 
+      selector:
+        select:
+          options:
+            - label: Индекс качества воздуха (AQI)
+              value: aqi
+            - label: Полная мощность (apparent_power)
+              value: apparent_power
+            - label: Заряд батареи (battery)
+              value: battery
+            - label: Углекислый газ (carbon_dioxide)
+              value: carbon_dioxide
+            - label: Угарный газ (carbon_monoxide)
+              value: carbon_monoxide
+            - label: Ток (current)
+              value: current
+            - label: Скорость передачи данных (data_rate)
+              value: data_rate
+            - label: Объем данных (data_size)
+              value: data_size
+            - label: Расстояние (distance)
+              value: distance
+            - label: Продолжительность (duration)
+              value: duration
+            - label: Энергия (energy)
+              value: energy
+            - label: Частота (frequency)
+              value: frequency
+            - label: Газ (gas)
+              value: gas
+            - label: Влажность (humidity)
+              value: humidity
+            - label: Освещенность (illuminance)
+              value: illuminance
+            - label: Финансы/Валюта (monetary)
+              value: monetary
+            - label: Твердые частицы PM1 (pm1)
+              value: pm1
+            - label: Твердые частицы PM2.5 (pm25)
+              value: pm25
+            - label: Твердые частицы PM10 (pm10)
+              value: pm10
+            - label: Мощность (power)
+              value: power
+            - label: Коэффициент мощности (power_factor)
+              value: power_factor
+            - label: Давление (pressure)
+              value: pressure
+            - label: Реактивная мощность (reactive_power)
+              value: reactive_power
+            - label: Сила сигнала (signal_strength)
+              value: signal_strength
+            - label: Скорость (speed)
+              value: speed
+            - label: Температура (temperature)
+              value: temperature
+            - label: ЛОС (Volatile Organic Compounds)
+              value: volatile_organic_compounds
+            - label: Напряжение (voltage)
+              value: voltage
+            - label: Объем (volume)
+              value: volume
+            - label: Вода (water)
+              value: water
+            - label: Вес (weight)
+              value: weight
+            - label: Скорость ветра (wind_speed)
+              value: wind_speed
+          mode: dropdown
+          
+    exclude_sensors:
+      name: Датчики для ИСКЛЮЧЕНИЯ из отчета
+      description: Выберите датчики, которые НЕ должны попадать в отчет (необязательно).
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: sensor
+          
+    telegram_notify_target:
+      name: 💬 Целевые уведомления Telegram
+      description: Выберите сущности вашего сервиса Telegram.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+variables:
+  target_class: !input target_device_class
+  exclude_input: !input exclude_sensors
+  telegram_target_input: !input telegram_notify_target
+          
+mode: single
+
+trigger:
+  - platform: time_pattern
+    minutes: !input report_interval_pattern
+
+action:
+  - service: telegram_bot.send_message
+    data:
+      parse_mode: plain_text
+      title: "📊 Периодический Отчет по {{ target_class }}" # ИЗМЕНЕНО
+      
+      # 1. ЛОГИКА TARGET
+      target: >-
+        {% set target_input = telegram_target_input | default({}) %}
+        {% set selected_entities = target_input.entity_id | default([]) | flatten %}
+        {% set entity_ids_only = selected_entities | map('regex_replace', find='^notify\..+_', replace='') | list %}
+        {% set ns = namespace(target_ids=[]) %}
+        {% for id_string in entity_ids_only %}
+          {% set cleaned_id = id_string | string | trim %}
+          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+            {% set id_with_hyphen = '-' ~ cleaned_id %}
+            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+          {% else %}
+            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.target_ids }}
+        
+      # 2. ЛОГИКА MESSAGE (Примитивный Jinja)
+      message: |
+        ---
+        Текущие показания всех отслеживаемых датчиков (Класс: {{ target_class }}):
+        ---
+        
+        {%- set excluded_ids = exclude_input.entity_id | default([]) | flatten -%}
+        {%- set report_lines = namespace(output=[]) -%}
+        
+        {%- for sensor in states.sensor 
+             | selectattr('attributes.device_class', 'eq', target_class) 
+             | selectattr('state', '!=', none) 
+             | sort(attribute='name') -%}
+             
+          {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
+          {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
+          
+          {%- if sensor.state != 'unknown' and sensor.state != 'unavailable' and sensor_is_excluded == false -%}
+            {%- set state = sensor.state -%}
+            {%- set name = sensor.name -%}
+            
+            {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ state | round(2) ~ " " ~ unit ] -%}
+          {%- endif -%}
+        {%- endfor -%}
+        
+        {%- if report_lines.output | length > 0 -%}
+        
+        {{ report_lines.output | join('\n') }}
+        
+        {%- else -%}
+        
+        (Не удалось найти активные датчики с классом {{ target_class }}. Проверьте их состояние или наличие единиц измерения.)
+        
+        {%- endif -%}

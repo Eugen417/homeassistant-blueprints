@@ -1,514 +1,211 @@
 blueprint:
-  name: 💨 Управление приточной вентиляцией по CO2 v19 (со встроенным быстрым режимом)
-  description: |
-    Автоматизация управляет вентилятором по уровню CO2. Добавлена **встроенная** настройка 
-    "Быстрый режим" (Fast Mode), который при включении принудительно запускает
-    вентилятор на максимальную скорость до достижения целевого порога CO2, 
-    игнорируя плавную регулировку.
+  name: 📊 Периодический Отчет (ВСЕ классы) 
+  description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_fan_speed_on-off.yaml
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 
   input:
-    # --- ОСНОВНЫЕ СУЩНОСТИ ---
-    co2_sensors:
-      name: Датчики CO2
-      selector:
-        entity:
-          domain: sensor
-          device_class: carbon_dioxide
-          multiple: true
-    target_fan:
-      name: 𖣘 Целевой вентилятор
-      default: fan.gtc_fan
-      selector:
-        entity:
-          domain: fan
-    automation_mode_select:
-      name: ⚙️🔄 Помощник Режима (Input Select)
-      description: |
-        **ОБЯЗАТЕЛЬНО:** Помощник типа **Выбор (Input Select)**. 
-        Используется для переключения логики: RUNNING (управление активно) или 
-        WAITING (ожидание внешнего включения/блокировка).
-        Создание (Настройки -> Помощники -> Выбор):
-        - **Опции:** Должны быть точно:
-          1. `RUNNING`
-          2. `WAITING`
-      selector:
-        entity:
-          domain: input_select
-    previous_co2_helper:
-      name: 💾 Помощник для предыдущего CO2
-      description: |
-        **ОБЯЗАТЕЛЬНО:** Помощник типа **Число (Input Number)**. 
-        Он хранит CO2 из прошлого цикла для сравнения и плавной регулировки.
-        Создание (Настройки -> Помощники -> Число):
-        - **Мин. значение:** 300
-        - **Макс. значение:** 5000
-        - **Шаг (Step):** 1
-        - **Ед. измерения:** ppm
-        - **Режим:** Box
-      selector:
-        entity:
-          domain: input_number
-    telegram_notifications:
-      name: ➤🤖 Сервис уведомлений Telegram (notify)
-      description: Выберите сервис уведомлений с указанием получателей (notify.telegram_bot...).
-      selector:
-        entity:
-          domain: notify
-          multiple: true
-          
-    # --- НАСТРОЙКИ РЕЖИМА ---
-    fast_mode_enabled: # <-- ИМЯ ПЕРЕМЕННОЙ ИЗМЕНЕНО ДЛЯ ЯСНОСТИ
-      name: 🏎💨 Активировать Быстрый режим (Fast Mode)
-      description: |
-        **Встроенный переключатель**. 
-        ВКЛ: вентилятор стартует сразу на **Максимальной скорости** и работает
-        на ней до достижения **Нижнего порога CO2**.
-        ВЫКЛ: используется плавная регулировка по порогам CO2.
-      default: false
-      selector:
-        boolean: # <-- ИСПОЛЬЗУЕМ СЕЛЕКТОР BOOLEAN
-          
-    # --- НАСТРОЙКИ ВРЕМЕНИ И ПОРОГОВ ---
-    update_frequency:
-      name: ⏱︎ Частота проверки (minutes)
-      description: Периодичность, с которой автоматизация проверяет CO2 и регулирует вентилятор (например, "/5" для каждых 5 минут). Используется в триггере time_pattern.
-      default: "/5"
+    report_interval_pattern:
+      name: Интервал отчета (например, /5)
+      description: Введите интервал в минутах в формате /N (например, /5 для каждых 5 минут).
+      default: "/30" 
       selector:
         text:
-    daily_alert_time:
-      name: ⏰ 💬. Время ежедневного оповещения
-      description: |
-        Время для ежедневной проверки: если CO2 высок, а вентилятор
-        выключен/заблокирован **вручную или другой автоматизацией**, вы получите
-        Telegram-уведомление с возможностью ручного включения.
-      default: "10:00:00"
+          type: text
+          
+    target_device_class:
+      name: Класс устройства для сканирования (device_class)
+      description: Выберите класс устройств для отчета.
+      default: temperature 
       selector:
-        time:
-    low_co2_max:
-      name: 📈🟢 Нижний порог CO2 (макс, ppm)
-      description: Это **целевой порог**, ниже которого автоматизация стремится поддерживать уровень CO2. При достижении этого уровня вентилятор замедляется или выключается.
-      default: 550
+        select:
+          options:
+            - label: Вес (weight)
+              value: weight
+            - label: Влажность (humidity)
+              value: humidity
+            - label: Вода (water)
+              value: water
+            - label: Газ (gas)
+              value: gas
+            - label: Давление (pressure)
+              value: pressure
+            - label: Заряд батареи (battery)
+              value: battery
+            - label: Индекс качества воздуха (AQI)
+              value: aqi
+            - label: Коэффициент мощности (power_factor)
+              value: power_factor
+            - label: ЛОС (Volatile Organic Compounds)
+              value: volatile_organic_compounds
+            - label: Мощность (power)
+              value: power
+            - label: Напряжение (voltage)
+              value: voltage
+            - label: Объем (volume)
+              value: volume
+            - label: Объем данных (data_size)
+              value: data_size
+            - label: Освещенность (illuminance)
+              value: illuminance
+            - label: Полная мощность (apparent_power)
+              value: apparent_power
+            - label: Продолжительность (duration)
+              value: duration
+            - label: Расстояние (distance)
+              value: distance
+            - label: Реактивная мощность (reactive_power)
+              value: reactive_power
+            - label: Сила сигнала (signal_strength)
+              value: signal_strength
+            - label: Скорость (speed)
+              value: speed
+            - label: Скорость ветра (wind_speed)
+              value: wind_speed
+            - label: Скорость передачи данных (data_rate)
+              value: data_rate
+            - label: Температура (temperature)
+              value: temperature
+            - label: Ток (current)
+              value: current
+            - label: Твердые частицы PM1 (pm1)
+              value: pm1
+            - label: Твердые частицы PM10 (pm10)
+              value: pm10
+            - label: Твердые частицы PM2.5 (pm25)
+              value: pm25
+            - label: Угарный газ (carbon_monoxide)
+              value: carbon_monoxide
+            - label: Углекислый газ (carbon_dioxide)
+              value: carbon_dioxide
+            - label: Финансы/Валюта (monetary)
+              value: monetary
+            - label: Частота (frequency)
+              value: frequency
+            - label: Энергия (energy)
+              value: energy
+          mode: dropdown
+          
+    exclude_sensors:
+      name: Датчики для ИСКЛЮЧЕНИЯ из отчета
+      description: Выберите датчики, которые НЕ должны попадать в отчет (необязательно).
+      default:
+        entity_id: []
       selector:
-        number: { min: 400, max: 1000, step: 1, mode: box, unit_of_measurement: ppm }
-    max_speed:
-      name: 📶💨 Максимальная скорость вентилятора (%)
-      default: 40
-      selector:
-        number: { min: 10, max: 100, step: 1, mode: slider, unit_of_measurement: '%' }
-    co2_increase_threshold:
-      name: 📈⏻ Порог включения CO2 (ppm)
-      description: На сколько текущий CO2 должен превысить "**Нижний порог CO2**" (`low_co2_max`), чтобы запустить вентилятор.
-      default: 15
-      selector:
-        number: { min: 0, max: 100, step: 1, mode: box, unit_of_measurement: ppm }
-    co2_change_threshold:
-      name: 📈🔄 Порог изменения CO2 (ppm)
-      description: |
-        На сколько CO2 должен измениться (вырасти или упасть) за 5-минутный
-        интервал, чтобы вызвать изменение скорости вентилятора на 10% вверх
-        или вниз. **Игнорируется в "Быстром режиме"**.
-      default: 15
-      selector:
-        number: { min: 1, max: 50, step: 1, mode: box, unit_of_measurement: ppm }
-    min_start_speed:
-      name: 🐌💨 Минимальная скорость запуска (%)
-      description: Скорость, на которую сбросится вентилятор после цикла работы. 0 - выключает его полностью.
-      default: 0
-      selector:
-        number: { min: 0, max: 100, step: 1, mode: slider, unit_of_measurement: '%' }
-
-# --- ТРИГГЕРЫ ( TRIGGERS ) ---
-trigger:
-  - minutes: !input update_frequency
-    id: time_based
-    platform: time_pattern
-  - event_type: telegram_callback
-    event_data:
-      command: /turn_on_gtc_fan
-    id: telegram_callback
-    platform: event
-  - at: !input daily_alert_time
-    id: daily_alert
-    platform: time
-
-# --- ДЕЙСТВИЯ ( ACTIONS ) ---
-action:
-  # 1. Переменные: Маппинг Input'ов и вычисление значений
-  - variables:
-      # Маппинг Input'ов
-      co2_sensors_list: !input co2_sensors
-      target_fan_entity: !input target_fan
-      low_co2_max_val: !input low_co2_max
-      max_speed_val: !input max_speed
-      co2_increase_threshold_val: !input co2_increase_threshold
-      co2_change_threshold_val: !input co2_change_threshold
-      start_speed_val: !input min_start_speed
-      previous_co2_helper_entity_id: !input previous_co2_helper
-      mode_select_entity_id: !input automation_mode_select
-      telegram_notify_entities: !input telegram_notifications
-      # Используем прямое значение из boolean-селектора
-      is_fast_mode: !input fast_mode_enabled # <-- ПРЯМОЕ ЗНАЧЕНИЕ (true/false)
-
-      # Вычисленные переменные
-      current_mode: "{{ states(mode_select_entity_id) }}"
-      is_fan_on: "{{ is_state(target_fan_entity, 'on') }}"
-      min_fan_speed: >
-        {% if start_speed_val | float == 0 %} 10 {% else %} {{ start_speed_val
-        }} {% endif %}
-      avg_co2: >
-        {% set valid = co2_sensors_list | map('states') | map('float',0) |
-        select('>',0) | list %} {% if valid | length > 0 %} {{ (valid | sum /
-        valid | length) | round(1) }} {% else %} 0 {% endif %}
-      current_speed: "{{ state_attr(target_fan_entity, 'percentage') | float(0) }}"
-      previous_co2: "{{ states(previous_co2_helper_entity_id) | float(0) }}"
-      target_chat_ids: >-
-        {% set selected = telegram_notify_entities | default([]) %} {%
-        set ids = selected | map('regex_replace', find='^.+_', replace='') |
-        list %} {% set ns = namespace(targets=[]) %} {% for id_str in ids %}
-          {% set clean_id = id_str | string | trim %}
-          {% if clean_id | length > 10 and not clean_id.startswith('-') %}
-            {% set ns.targets = ns.targets + ['-' ~ clean_id] %}
-          {% else %}
-            {% set ns.targets = ns.targets + [clean_id] %}
-          {% endif %}
-        {% endfor %} {{ ns.targets }}
-
-  # 2. Основная логика (Choose block)
-  - choose:
-      # --- БЛОК 1: time_based (каждые 5 минут) ---
-    - conditions:
-      - condition: trigger
-        id: time_based
-      sequence:
-        - choose:
-            # - УСЛОВИЕ 1.1: CO2 высокий, Вентилятор OFF -> Включить
-            # Стартовая скорость зависит от 'is_fast_mode'
-          - conditions:
-            - condition: template
-              value_template: "{{ not is_fan_on }}"
-            - condition: template
-              value_template: >
-                {{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}
-            - condition: template
-              value_template: "{{ current_mode == 'RUNNING' }}"
-            sequence:
-              - variables:
-                  # is_fast_mode - это булево значение (true/false)
-                  initial_speed: >
-                    {% if is_fast_mode %} {{ max_speed_val }} {% else %} {{ min_fan_speed }} {% endif %}
-              - target:
-                  entity_id: "{{ target_fan_entity }}"
-                service: fan.turn_on
-              - delay:
-                  seconds: 50
-              - target:
-                  entity_id: "{{ target_fan_entity }}"
-                data:
-                  percentage: "{{ initial_speed | float(10) | round(0) }}"
-                service: fan.set_percentage
-              - target:
-                  entity_id: "{{ mode_select_entity_id }}"
-                data:
-                  option: WAITING
-                service: input_select.select_option
+        target:
+          entity:
+            - domain: sensor
             
-            # - УСЛОВИЕ 1.2: Вентилятор ON -> Регулировка
-          - conditions:
-            - condition: template
-              value_template: "{{ is_fan_on }}"
-            sequence:
-              - choose:
-                  # - УСЛОВИЕ 1.2.1: CO2 низкий -> Выключить / Сбросить скорость (единое для обоих режимов)
-                - conditions:
-                  - condition: template
-                    value_template: |
-                      {{ avg_co2 < low_co2_max_val | float }}
-                  sequence:
-                    - if:
-                      - condition: template
-                        value_template: "{{ start_speed_val | float == 0 }}"
-                      then:
-                        - target:
-                            entity_id: "{{ target_fan_entity }}"
-                          data:
-                            percentage: 10
-                          service: fan.set_percentage
-                        - delay:
-                            seconds: 5
-                        - target:
-                            entity_id: "{{ target_fan_entity }}"
-                          service: fan.turn_off
-                        - target:
-                            entity_id: "{{ mode_select_entity_id }}"
-                          data:
-                            option: RUNNING
-                          service: input_select.select_option
-                      else:
-                        - target:
-                            entity_id: "{{ target_fan_entity }}"
-                          data:
-                            percentage: "{{ start_speed_val }}"
-                          service: fan.set_percentage
-                          
-                  # --- ПЛАВНАЯ РЕГУЛИРОВКА (ТОЛЬКО ЕСЛИ FAST MODE ВЫКЛЮЧЕН) ---
-                  
-                  # - УСЛОВИЕ 1.2.2: CO2 падает -> Уменьшить скорость (ТОЛЬКО БЫСТРЫЙ РЕЖИМ OFF)
-                - conditions:
-                  - condition: template
-                    value_template: "{{ not is_fast_mode }}" # <-- ПРОВЕРКА БУЛЕВОЙ ПЕРЕМЕННОЙ
-                  - condition: template
-                    value_template: >
-                      {{ (previous_co2 - avg_co2) >= co2_change_threshold_val | float }}
-                  sequence:
-                    - variables:
-                        new_speed: "{{ [current_speed - 10, min_fan_speed] | max }}"
-                    - target:
-                        entity_id: "{{ target_fan_entity }}"
-                      data:
-                        percentage: "{{ new_speed }}"
-                      service: fan.set_percentage
-                      
-                  # - УСЛОВИЕ 1.2.3: CO2 растет -> Увеличить скорость (ТОЛЬКО БЫСТРЫЙ РЕЖИМ OFF)
-                - conditions:
-                  - condition: template
-                    value_template: "{{ not is_fast_mode }}" # <-- ПРОВЕРКА БУЛЕВОЙ ПЕРЕМЕННОЙ
-                  - condition: template
-                    value_template: |
-                      {{ avg_co2 > previous_co2 }}
-                  sequence:
-                    - variables:
-                        new_speed: "{{ [current_speed + 10, max_speed_val] | min }}"
-                    - target:
-                        entity_id: "{{ target_fan_entity }}"
-                      data:
-                        percentage: "{{ new_speed }}"
-                      service: fan.set_percentage
-                      
-                  # --- ПОДДЕРЖАНИЕ СКОРОСТИ В FAST MODE (Если CO2 > Порога) ---
-                  # - УСЛОВИЕ 1.2.4: FAST MODE ВКЛЮЧЕН, CO2 еще не достиг цели -> Установить/Поддерживать MAX SPEED
-                - conditions:
-                  - condition: template
-                    value_template: "{{ is_fast_mode }}" # <-- ПРОВЕРКА БУЛЕВОЙ ПЕРЕМЕННОЙ
-                  - condition: template
-                    value_template: |
-                      {{ avg_co2 >= low_co2_max_val | float }} # CO2 все еще высок
-                  sequence:
-                    - if:
-                      - condition: template
-                        value_template: "{{ current_speed < max_speed_val }}"
-                      then:
-                        - target:
-                            entity_id: "{{ target_fan_entity }}"
-                          data:
-                            percentage: "{{ max_speed_val }}"
-                          service: fan.set_percentage
-        - data:
-            entity_id: "{{ previous_co2_helper_entity_id }}"
-            value: "{{ avg_co2 }}"
-          service: input_number.set_value
+    telegram_notify_target:
+      name: 💬 Целевые уведомления Telegram
+      description: Выберите сущности вашего сервиса Telegram.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
 
-      # --- БЛОК 2: daily_alert (ежедневное оповещение) ---
-    - conditions:
-      - condition: trigger
-        id: daily_alert
-      sequence:
-        - choose:
-            # - УСЛОВИЕ 2.1: CO2 высокий, Вентилятор OFF, Режим WAITING -> Уведомление
-          - conditions:
-            - condition: template
-              value_template: >
-                {{ avg_co2 >= (low_co2_max_val | float +
-                co2_increase_threshold_val | float) }}
-            - condition: template
-              value_template: "{{ not is_fan_on }}"
-            - condition: template
-              value_template: "{{ current_mode == 'WAITING' }}"
-            - condition: template
-              value_template: "{{ target_chat_ids | length > 0 }}"
-            sequence:
-              - service: telegram_bot.send_message
-                data:
-                  target: "{{ target_chat_ids }}"
-                  message: >
-                    {# 1. Определение Заголовка (Title) #} {%- set
-                    message_title = "💨 \*Внимание: Блокировка
-                    Вентустановки\*" %}
-
-                    {# 2. Определение Тела Сообщения (Message Body) #} {%-
-                    set co2_turn_on_threshold_calculated = ((low_co2_max_val | float + co2_increase_threshold_val | float) | round(0)) -%}
-                    {%- set fast_mode_status = "Быстрый режим: " ~ ("ON" if is_fast_mode else "OFF") %}
-                    {%- set raw_message_body = "Уровень CO2 (" ~ (avg_co2 |
-                    round(0)) ~ " ppm) выше установленного (порог: " ~
-                    co2_turn_on_threshold_calculated ~ " ppm), но
-                    автоматизация не может запустить вентустановку, потому
-                    что она выключена вручную или другой автоматизацией.
-                    Текущий режим: WAITING. (" ~ fast_mode_status ~ ")" %}
-
-                    {# 3. Экранирование спецсимволов для MarkdownV2
-                    (применяется только к телу!) #} {%- set escaped_body =
-                    raw_message_body | replace('&', '&amp;') | replace('~',
-                    '\~') | replace('`', '\`') | replace('>', '\>') |
-                    replace('#', '\#') | replace('+', '\+') | replace('-',
-                    '\-') | replace('=', '\=') | replace('|', '\|') |
-                    replace('{', '\{') | replace('}', '\}') | replace('.',
-                    '\.') | replace('!', '\!') | replace('*', '\*') |
-                    replace('_', '\_') | replace('[', '\[') | replace(']',
-                    '\]') | replace('(', '\(') | replace(')', '\)') |
-                    replace('%', '\%') %}
-
-                    {# 4. Объединение Заголовка и Тела #} {{ message_title ~
-                    "\n\n" ~ escaped_body }}
-                  parse_mode: markdownv2
-                  inline_keyboard:
-                    - "ВКЛЮЧИТЬ FAN:/turn_on_{{ target_fan_entity.split('.')[-1] }}"
-    
-      # --- БЛОК 3: telegram_callback (ручное включение) ---
-    - conditions:
-      - condition: trigger
-        id: telegram_callback
-      sequence:
-        - service: telegram_bot.answer_callback_query
-          data:
-            callback_query_id: "{{ trigger.event.data.id }}"
-            message: Проверяю статус gtc_fan и режим автоматики...
-            show_alert: false
-        - choose:
-            # - УСЛОВИЕ 3.1: Уже работает
-          - conditions:
-            - condition: template
-              value_template: "{{ is_fan_on }}"
-            - condition: template
-              value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
-            sequence:
-              - alias: Автоматизация уже работает
-                service: telegram_bot.send_message
-                data:
-                  target: "{{ trigger.event.data.chat_id }}"
-                  message: >
-                    ℹ️ Вентилятор <b>{{ target_fan_entity.split('.')[-1] }}</b> уже включен! Скорость:
-                    <b>{{ state_attr(target_fan_entity, 'percentage') }}%</b>.
-                    Автоматизация активна (режим: {{
-                    states(mode_select_entity_id)
-                    }}). Включение не требуется. (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)
-                  parse_mode: html
-                  
-            # - УСЛОВИЕ 3.2: Не работает, CO2 низкий
-          - conditions:
-            - condition: template
-              value_template: "{{ not is_fan_on }}"
-            - condition: template
-              value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
-            - condition: template
-              value_template: >
-                {{
-                states(previous_co2_helper_entity_id)
-                | float(0)
-                < (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}
-            sequence:
-              - alias: Установка в режиме ожидания (CO2 низкий)
-                service: telegram_bot.send_message
-                data:
-                  target: "{{ trigger.event.data.chat_id }}"
-                  message: >
-                    ℹ️ Установка находится в режиме ожидания (<b>{{
-                    states(mode_select_entity_id)
-                    }}</b>). Уровень CO2 ({{
-                    states(previous_co2_helper_entity_id)
-                    }} ppm) ниже порога ({{
-                    (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) | round(0)
-                    }} ppm). Включение вручную не
-                    требуется. (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)
-                  parse_mode: html
-                  
-            # - УСЛОВИЕ 3.3: Не работает, CO2 высокий -> Включить
-          - conditions:
-            - condition: template
-              value_template: "{{ not is_fan_on }}"
-            - condition: template
-              value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
-            - condition: template
-              value_template: >
-                {{
-                states(previous_co2_helper_entity_id)
-                | float(0)
-                >= (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}
-            sequence:
-              - alias: "Включение - Шаг 1: Первая попытка"
-                service: fan.turn_on
-                target:
-                  entity_id: "{{ target_fan_entity }}"
-              - delay: "00:00:50"
-              - choose:
-                - conditions:
-                  - condition: template
-                    value_template: "{{ not is_state(target_fan_entity, 'on') }}"
-                  sequence:
-                    - service: telegram_bot.send_message
-                      data:
-                        target: "{{ trigger.event.data.chat_id }}"
-                        message: >-
-                          Попытка включения 1: не удалось ❌. Пробую
-                          повторно...
-                    - service: fan.turn_on
-                      target:
-                        entity_id: "{{ target_fan_entity }}"
-                    - delay: "00:00:50"
-                default: []
-
-              - choose:
-                - conditions:
-                  - condition: template
-                    value_template: "{{ is_state(target_fan_entity, 'on') }}"
-                  sequence:
-                    # Здесь устанавливаем initial_speed
-                    - variables:
-                        initial_speed: >
-                          {% if is_fast_mode %} {{ max_speed_val }} {% else %} {{ min_fan_speed }} {% endif %}
-                    # Устанавливаем скорость
-                    - target:
-                        entity_id: "{{ target_fan_entity }}"
-                      data:
-                        percentage: "{{ initial_speed | float(10) | round(0) }}"
-                      service: fan.set_percentage
-                    - service: input_select.select_option
-                      data:
-                        entity_id: "{{ mode_select_entity_id }}"
-                        option: RUNNING
-                      enabled: false
-                    - service: telegram_bot.send_message
-                      data:
-                        target: "{{ trigger.event.data.chat_id }}"
-                        message: >-
-                          ✅ {{ target_fan_entity.split('.')[-1] }} включен! Автоматизация завершена
-                          успешно. (Запущен в **{{ 'быстром' if is_fast_mode else 'автоматическом' }}** режиме).
-                        parse_mode: html
-                - conditions:
-                  - condition: template
-                    value_template: "{{ not is_state(target_fan_entity, 'on') }}"
-                  sequence:
-                    - service: telegram_bot.send_message
-                      data:
-                        target: "{{ trigger.event.data.chat_id }}"
-                        message: >
-                          ❌ <b>{{ target_fan_entity.split('.')[-1] }}</b> не включился после двух
-                          попыток! Требуется ручная проверка устройства.
-                        parse_mode: html
-            
-          # - УСЛОВИЕ 3.4: Неизвестный статус (default)
-          default: 
-            - alias: Невозможно включить/Неизвестный статус
-              service: telegram_bot.send_message
-              data:
-                target: "{{ trigger.event.data.chat_id }}"
-                message: "⚠️ Установка не может быть включена (Текущий режим: <b>{{ states(mode_select_entity_id) }}</b>).\_ Вентилятор: <b>{{ states(target_fan_entity) }}</b>. Текущий CO2: <b>{{ states(previous_co2_helper_entity_id) }} ppm</b>. Порог включения: <b>{{ (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) | round(0) }} ppm</b>.\n (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)"
-                parse_mode: html
-
-        # ЭТО ДЕЙСТВИЕ ДОЛЖНО ВЫПОЛНЯТЬСЯ ВСЕГДА В КОНЦЕ БЛОКА 3
-        - service: input_number.set_value
-          data:
-            entity_id: "{{ previous_co2_helper_entity_id }}"
-            value: "{{ avg_co2 }}"
-
+variables:
+  target_class: !input target_device_class
+  exclude_input: !input exclude_sensors
+  telegram_target_input: !input telegram_notify_target
+          
 mode: single
+
+trigger:
+  - platform: time_pattern
+    minutes: !input report_interval_pattern
+
+action:
+  - service: telegram_bot.send_message
+    data:
+      
+      # 1. ЛОГИКА TARGET
+      target: >-
+        {% set target_input = telegram_target_input | default({}) %}
+        {% set selected_entities = target_input.entity_id | default([]) | flatten %}
+        {% set entity_ids_only = selected_entities | map('regex_replace', find='^notify\..+_', replace='') | list %}
+        {% set ns = namespace(target_ids=[]) %}
+        {% for id_string in entity_ids_only %}
+          {% set cleaned_id = id_string | string | trim %}
+          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+            {% set id_with_hyphen = '-' ~ cleaned_id %}
+            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+          {% else %}
+            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.target_ids }}
+        
+      # 2. ТЕЛО СООБЩЕНИЯ (ВКЛЮЧАЯ РУССКОЯЗЫЧНЫЕ ЛЕЙБЛЫ ДЛЯ ЗАГОЛОВКА)
+      message: |
+        {% set class_labels = {
+          'aqi': 'Индекс качества воздуха (AQI)',
+          'apparent_power': 'Полная мощность',
+          'battery': 'Заряд батареи',
+          'carbon_dioxide': 'Углекислый газ',
+          'carbon_monoxide': 'Угарный газ',
+          'current': 'Ток',
+          'data_rate': 'Скорость передачи данных',
+          'data_size': 'Объем данных',
+          'distance': 'Расстояние',
+          'duration': 'Продолжительность',
+          'energy': 'Энергия',
+          'frequency': 'Частота',
+          'gas': 'Газ',
+          'humidity': 'Влажность',
+          'illuminance': 'Освещенность',
+          'monetary': 'Финансы/Валюта',
+          'pm1': 'Твердые частицы PM1',
+          'pm25': 'Твердые частицы PM2.5',
+          'pm10': 'Твердые частицы PM10',
+          'power': 'Мощность',
+          'power_factor': 'Коэффициент мощности',
+          'pressure': 'Давление',
+          'reactive_power': 'Реактивная мощность',
+          'signal_strength': 'Сила сигнала',
+          'speed': 'Скорость',
+          'temperature': 'Температура',
+          'volatile_organic_compounds': 'ЛОС',
+          'voltage': 'Напряжение',
+          'volume': 'Объем',
+          'water': 'Вода',
+          'weight': 'Вес',
+          'wind_speed': 'Скорость ветра'
+        } %}
+        {% set report_title = class_labels[target_class] | default(target_class) %}
+        
+        📊 <b>Периодический Отчет по {{ report_title }}</b>
+        
+        Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }})
+        {% set excluded_ids = exclude_input.entity_id | default([]) | flatten %}
+        {% set report_lines = namespace(output=[]) %}
+        
+        {%- for sensor in states.sensor 
+              | selectattr('attributes.device_class', 'eq', target_class) 
+              | selectattr('state', '!=', none) 
+              | sort(attribute='name') -%}
+              
+          {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
+          {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
+          
+          {%- if sensor.state != 'unknown' and sensor.state != 'unavailable' and sensor_is_excluded == false -%}
+            {%- set state = sensor.state -%}
+            {%- set name = sensor.name -%}
+            
+            {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ state | round(2) ~ " " ~ unit ] -%}
+          {%- endif -%}
+        {%- endfor -%}
+        
+        {%- if report_lines.output | length > 0 -%}
+        
+        {{ report_lines.output | join('\n') }}
+        
+        {%- else -%}
+        
+        (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их состояние или наличие единиц измерения.)
+        
+        {%- endif -%}
+        
+      parse_mode: html

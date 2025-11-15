@@ -142,9 +142,9 @@ action:
         
       # 2. ЛОГИКА MESSAGE (Примитивный Jinja)
       message: |
-        ---
+        
         Текущие показания всех отслеживаемых датчиков (Класс: {{ target_class }}):
-        ---
+        
         
         {%- set excluded_ids = exclude_input.entity_id | default([]) | flatten -%}
         {%- set report_lines = namespace(output=[]) -%}

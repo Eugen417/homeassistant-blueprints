@@ -2,7 +2,7 @@ blueprint:
   name: 📊 Периодический Отчет (ВСЕ классы) 
   description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notifi.yaml 
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
   
   input:
     report_interval_pattern:

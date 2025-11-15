@@ -3,7 +3,7 @@ blueprint:
   description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
-  
+
   input:
     report_interval_pattern:
       name: Интервал отчета (например, /5)
@@ -20,70 +20,70 @@ blueprint:
       selector:
         select:
           options:
-            - label: Индекс качества воздуха (AQI)
-              value: aqi
-            - label: Полная мощность (apparent_power)
-              value: apparent_power
-            - label: Заряд батареи (battery)
-              value: battery
-            - label: Углекислый газ (carbon_dioxide)
-              value: carbon_dioxide
-            - label: Угарный газ (carbon_monoxide)
-              value: carbon_monoxide
-            - label: Ток (current)
-              value: current
-            - label: Скорость передачи данных (data_rate)
-              value: data_rate
-            - label: Объем данных (data_size)
-              value: data_size
-            - label: Расстояние (distance)
-              value: distance
-            - label: Продолжительность (duration)
-              value: duration
-            - label: Энергия (energy)
-              value: energy
-            - label: Частота (frequency)
-              value: frequency
-            - label: Газ (gas)
-              value: gas
+            - label: Вес (weight)
+              value: weight
             - label: Влажность (humidity)
               value: humidity
-            - label: Освещенность (illuminance)
-              value: illuminance
-            - label: Финансы/Валюта (monetary)
-              value: monetary
-            - label: Твердые частицы PM1 (pm1)
-              value: pm1
-            - label: Твердые частицы PM2.5 (pm25)
-              value: pm25
-            - label: Твердые частицы PM10 (pm10)
-              value: pm10
-            - label: Мощность (power)
-              value: power
-            - label: Коэффициент мощности (power_factor)
-              value: power_factor
+            - label: Вода (water)
+              value: water
+            - label: Газ (gas)
+              value: gas
             - label: Давление (pressure)
               value: pressure
+            - label: Заряд батареи (battery)
+              value: battery
+            - label: Индекс качества воздуха (AQI)
+              value: aqi
+            - label: Коэффициент мощности (power_factor)
+              value: power_factor
+            - label: ЛОС (Volatile Organic Compounds)
+              value: volatile_organic_compounds
+            - label: Мощность (power)
+              value: power
+            - label: Напряжение (voltage)
+              value: voltage
+            - label: Объем (volume)
+              value: volume
+            - label: Объем данных (data_size)
+              value: data_size
+            - label: Освещенность (illuminance)
+              value: illuminance
+            - label: Полная мощность (apparent_power)
+              value: apparent_power
+            - label: Продолжительность (duration)
+              value: duration
+            - label: Расстояние (distance)
+              value: distance
             - label: Реактивная мощность (reactive_power)
               value: reactive_power
             - label: Сила сигнала (signal_strength)
               value: signal_strength
             - label: Скорость (speed)
               value: speed
-            - label: Температура (temperature)
-              value: temperature
-            - label: ЛОС (Volatile Organic Compounds)
-              value: volatile_organic_compounds
-            - label: Напряжение (voltage)
-              value: voltage
-            - label: Объем (volume)
-              value: volume
-            - label: Вода (water)
-              value: water
-            - label: Вес (weight)
-              value: weight
             - label: Скорость ветра (wind_speed)
               value: wind_speed
+            - label: Скорость передачи данных (data_rate)
+              value: data_rate
+            - label: Температура (temperature)
+              value: temperature
+            - label: Ток (current)
+              value: current
+            - label: Твердые частицы PM1 (pm1)
+              value: pm1
+            - label: Твердые частицы PM10 (pm10)
+              value: pm10
+            - label: Твердые частицы PM2.5 (pm25)
+              value: pm25
+            - label: Угарный газ (carbon_monoxide)
+              value: carbon_monoxide
+            - label: Углекислый газ (carbon_dioxide)
+              value: carbon_dioxide
+            - label: Финансы/Валюта (monetary)
+              value: monetary
+            - label: Частота (frequency)
+              value: frequency
+            - label: Энергия (energy)
+              value: energy
           mode: dropdown
           
     exclude_sensors:
@@ -95,7 +95,7 @@ blueprint:
         target:
           entity:
             - domain: sensor
-          
+            
     telegram_notify_target:
       name: 💬 Целевые уведомления Telegram
       description: Выберите сущности вашего сервиса Telegram.
@@ -138,19 +138,55 @@ action:
         {% endfor %}
         {{ ns.target_ids }}
         
-      # 2. ТЕЛО СООБЩЕНИЯ (ИСПРАВЛЕНО: Убран '-' из первых Jinja-тегов)
+      # 2. ТЕЛО СООБЩЕНИЯ (ВКЛЮЧАЯ РУССКОЯЗЫЧНЫЕ ЛЕЙБЛЫ ДЛЯ ЗАГОЛОВКА)
       message: |
-        📊 <b>Периодический Отчет по {{ target_class | replace('_', ' ') }}</b>
+        {% set class_labels = {
+          'aqi': 'Индекс качества воздуха (AQI)',
+          'apparent_power': 'Полная мощность',
+          'battery': 'Заряд батареи',
+          'carbon_dioxide': 'Углекислый газ',
+          'carbon_monoxide': 'Угарный газ',
+          'current': 'Ток',
+          'data_rate': 'Скорость передачи данных',
+          'data_size': 'Объем данных',
+          'distance': 'Расстояние',
+          'duration': 'Продолжительность',
+          'energy': 'Энергия',
+          'frequency': 'Частота',
+          'gas': 'Газ',
+          'humidity': 'Влажность',
+          'illuminance': 'Освещенность',
+          'monetary': 'Финансы/Валюта',
+          'pm1': 'Твердые частицы PM1',
+          'pm25': 'Твердые частицы PM2.5',
+          'pm10': 'Твердые частицы PM10',
+          'power': 'Мощность',
+          'power_factor': 'Коэффициент мощности',
+          'pressure': 'Давление',
+          'reactive_power': 'Реактивная мощность',
+          'signal_strength': 'Сила сигнала',
+          'speed': 'Скорость',
+          'temperature': 'Температура',
+          'volatile_organic_compounds': 'ЛОС',
+          'voltage': 'Напряжение',
+          'volume': 'Объем',
+          'water': 'Вода',
+          'weight': 'Вес',
+          'wind_speed': 'Скорость ветра'
+        } %}
+        {% set report_title = class_labels[target_class] | default(target_class) %}
         
-        Текущие показания всех отслеживаемых датчиков (Класс: {{ target_class | replace('_', ' ') }})
+        📊 <b>Периодический Отчет по {{ report_title }}</b>
+        
+        Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }})
         {% set excluded_ids = exclude_input.entity_id | default([]) | flatten %}
         {% set report_lines = namespace(output=[]) %}
         
         {%- for sensor in states.sensor 
-             | selectattr('attributes.device_class', 'eq', target_class) 
-             | selectattr('state', '!=', none) 
-             | sort(attribute='name') -%}
-             
+              | selectattr('attributes.device_class', 'eq', target_class) 
+              | selectattr('state', '!=', none) 
+              | sort(attribute='name') -%}
+              
           {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
           {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
           
@@ -168,7 +204,7 @@ action:
         
         {%- else -%}
         
-        (Не удалось найти активные датчики с классом {{ target_class | replace('_', ' ') }}. Проверьте их состояние или наличие единиц измерения.)
+        (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их состояние или наличие единиц измерения.)
         
         {%- endif -%}
         

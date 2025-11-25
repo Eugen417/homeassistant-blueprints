@@ -138,7 +138,7 @@ action:
         {% endfor %}
         {{ ns.target_ids }}
         
-      # 2. ТЕЛО СООБЩЕНИЯ (ВКЛЮЧАЯ РУССКОЯЗЫЧНЫЕ ЛЕЙБЛЫ ДЛЯ ЗАГОЛОВКА)
+      # 2. ТЕЛО СООБЩЕНИЯ (Модифицировано для включения и выделения недоступных статусов)
       message: |
         {% set class_labels = {
           'aqi': 'Индекс качества воздуха (AQI)',
@@ -181,20 +181,22 @@ action:
         Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }})
         {% set excluded_ids = exclude_input.entity_id | default([]) | flatten %}
         {% set report_lines = namespace(output=[]) %}
-        
-        {%- for sensor in states.sensor 
-              | selectattr('attributes.device_class', 'eq', target_class) 
-              | selectattr('state', '!=', none) 
+        {%- for sensor in states.sensor
+              | selectattr('attributes.device_class', 'eq', target_class)
               | sort(attribute='name') -%}
-              
-          {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
           {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
-          
-          {%- if sensor.state != 'unknown' and sensor.state != 'unavailable' and sensor_is_excluded == false -%}
-            {%- set state = sensor.state -%}
-            {%- set name = sensor.name -%}
-            
-            {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ state | round(2) ~ " " ~ unit ] -%}
+          {%- if sensor_is_excluded == false -%}
+              {%- set name = sensor.name -%}
+              {%- set state = sensor.state -%}
+              {%- if state in ['unknown', 'unavailable', 'none', ''] -%}
+                  {# Выделение статуса <b>жирным</b> шрифтом #}
+                  {%- set formatted_value = "<b>(" ~ state ~ ")</b>" -%}
+              {%- else -%}
+                  {# Если состояние числовое, округляем и добавляем единицу измерения #}
+                  {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
+                  {%- set formatted_value = state | round(2) ~ " " ~ unit -%}
+              {%- endif -%}
+              {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ formatted_value ] -%}
           {%- endif -%}
         {%- endfor -%}
         
@@ -204,7 +206,7 @@ action:
         
         {%- else -%}
         
-        (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их состояние или наличие единиц измерения.)
+        (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их наличие.)
         
         {%- endif -%}
         

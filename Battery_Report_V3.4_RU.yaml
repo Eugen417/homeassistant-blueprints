@@ -1,7 +1,7 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_8_ru
+id: automation_otchet_po_sostoianiiu_batarei_v3_8_1_ru
 
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.8)
+  name: 🪫 Отчет по состоянию батарей (v3.8.1)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время.
@@ -276,9 +276,14 @@ action:
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
-                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set line_action = text_disposable_action | replace('%LEVEL%', numerical_level | string) | replace('%TYPE%', battery_type | string) | replace('%QTY%', battery_quantity | string) %}
-                {% set line = cleaned_name ~ ": " ~ line_action %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
+                {# Экранирование данных, которые будут вставлены в HTML #}
+                {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
+
+                {% set line_action = text_disposable_action | replace('%LEVEL%', numerical_level | string) | replace('%TYPE%', escaped_battery_type) | replace('%QTY%', escaped_quantity) %}
+                {% set line = escaped_name ~ ": " ~ line_action %}
                 {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -304,8 +309,11 @@ action:
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if is_rechargeable %}
+                {# Экранирование данных, которые будут вставлены в HTML #}
+                {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                
                 {% set line_action = text_rechargeable_action | replace('%LEVEL%', numerical_level | string) %}
-                {% set line = cleaned_name ~ ": " ~ line_action %}
+                {% set line = escaped_name ~ ": " ~ line_action %}
                 {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
               {% endif %}
             {% endif %}
@@ -349,11 +357,17 @@ action:
               
               {% set details = "" %}
               {% if not is_rechargeable %}
-                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') %}
-                {% set details = " (Тип: " ~ battery_type ~ ", Кол-во: " ~ battery_quantity ~ " шт)" %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
+                {# Экранирование данных, которые будут вставлены в HTML #}
+                {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set details = " (Тип: " ~ escaped_battery_type ~ ", Кол-во: " ~ escaped_quantity ~ " шт)" %}
               {% endif %}
-
-              {% set line = status_icon ~ " " ~ cleaned_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
+              
+              {# Экранирование имени устройства #}
+              {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+              
+              {% set line = status_icon ~ " " ~ escaped_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
               {% set ns.all_lines = ns.all_lines + [{ 'level': numerical_level, 'line': line }] %}
             {% endif %}
           {% endif %}
@@ -374,10 +388,10 @@ action:
             | selectattr('attributes.battery_last_reported_level', 'defined') 
             | rejectattr('entity_id', 'in', exclude_list) 
             | list %}
-            
+          
         {% set grouped_by_type = all_battery_sensors 
             | groupby('attributes.battery_type') %}
-            
+          
         {% for type, sensors in grouped_by_type %}
           {% set total_quantity = namespace(value=0) %}
           {% for sensor in sensors %}
@@ -390,7 +404,10 @@ action:
             {% set display_type = text_rechargeable_type %}
           {% endif %}
 
-          {% set line = "• " ~ display_type ~ " (Всего: " ~ total_quantity.value ~ " шт)" %}
+          {# Экранирование имени типа батареи #}
+          {% set escaped_display_type = display_type | replace('<', '&lt;') | replace('>', '&gt;') %}
+          
+          {% set line = "• " ~ escaped_display_type ~ " (Всего: " ~ total_quantity.value ~ " шт)" %}
           {% set ns.output_lines = ns.output_lines + [line] %}
         {% endfor %}
         
@@ -410,7 +427,11 @@ action:
             {% if sensor.state in ['unavailable', 'unknown'] %}
               {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
-              {% set line = "❓ " ~ cleaned_name ~ " (Статус: " ~ sensor.state ~ ")" %}
+              
+              {# Экранирование имени устройства #}
+              {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+              
+              {% set line = "❓ " ~ escaped_name ~ " (Статус: " ~ sensor.state ~ ")" %}
               {% set ns.offline_lines = ns.offline_lines + [line] %}
             {% endif %}
           {% endif %}

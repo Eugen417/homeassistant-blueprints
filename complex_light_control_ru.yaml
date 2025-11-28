@@ -1,0 +1,226 @@
+id: single_light_motion_door_priority_final_with_helper
+alias: Управление Светом- Движение, Дверь и Ручной Приоритет (С ХЕЛПЕРОМ)
+
+blueprint:
+  name: 💡 Свет- Движение, Дверь и Ручной Приоритет (С Хелпером)
+  description: |
+    Выполняет все условия, используя вспомогательный переключатель для надежного отслеживания ручного режима.
+    
+    1. **День (08:00-21:00):** Управление только выключателем. Включение по двери работает, но выключения нет.
+    2. **Ночь (21:00-08:00):** Управление по Движению/Двери, с автоматическим выключением.
+    3. **Приоритет:** Включение света вручную (выключателем) блокирует автоматическое выключение в любое время.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/complex_light_control_ru.yaml
+  
+  input:
+    control_entity:
+      name: 💡/⚙️ Целевой Выключатель/Светильник
+      description: Сущность реле или умной лампочки, которой управляет HA.
+      selector:
+        entity: # <-- ИСПРАВЛЕНИЕ: Заменен target на entity
+          domain: [light, switch]
+            
+    motion_sensor:
+      name: 🧍 Датчик Движения
+      description: Сенсор для ночного управления.
+      selector:
+        entity:
+          domain: binary_sensor
+          
+    door_sensor:
+      name: 🚪 Датчик Открытия
+      description: Сенсор двери/окна для активации света.
+      selector:
+        entity:
+          domain: binary_sensor
+          
+    motion_off_delay:
+      name: ⏱️ Задержка выключения по отсутствию (мин)
+      description: Задержка выключения света после прекращения движения/закрытия двери (только ночью).
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: min
+          mode: slider
+          
+    schedule_start_time:
+      name: ⏰ Начало "Дневного" режима (08:00)
+      default: '08:00:00'
+      selector:
+        time:
+        
+    schedule_end_time:
+      name: ⏰ Начало "Ночного" режима (21:00)
+      default: '21:00:00'
+      selector:
+        time:
+
+    manual_lock_helper:
+      name: 🚩 Флаг Ручной Блокировки (Input Boolean)
+      description: |
+        **ОБЯЗАТЕЛЬНО!** Создайте в меню "Настройки -> Устройства и службы -> Помощники" новый помощник типа **"Переключатель" (Input Boolean)** и выберите его здесь. Он отслеживает, был ли свет включен/выключен вручную.
+      selector:
+        entity:
+          domain: input_boolean
+          
+mode: restart
+
+trigger:
+  # 1. ТРИГГЕРЫ ПО ВРЕМЕНИ
+  - platform: time
+    at: !input schedule_start_time
+    id: 'day_mode_start'
+  - platform: time
+    at: !input schedule_end_time
+    id: 'night_mode_start'
+
+  # 2. ТРИГГЕРЫ АКТИВАЦИИ
+  - platform: state
+    entity_id: !input motion_sensor
+    to: 'on'
+    id: 'motion_on'
+  - platform: state
+    entity_id: !input door_sensor
+    to: 'on'
+    id: 'door_open'
+
+  # 3. ТРИГГЕРЫ ДЕАКТИВАЦИИ (для запуска задержки)
+  - platform: state
+    entity_id: !input motion_sensor
+    to: 'off'
+    id: 'motion_off'
+  - platform: state
+    entity_id: !input door_sensor
+    to: 'off'
+    id: 'door_close'
+
+  # 4. ТРИГГЕР: Отслеживание ручного изменения состояния целевой сущности
+  - platform: state
+    entity_id: !input control_entity
+    to: ['on', 'off']
+    id: 'control_entity_change'
+
+action:
+  - choose:
+    
+    # =======================================================
+    # 0. УПРАВЛЕНИЕ ФЛАГОМ БЛОКИРОВКИ (Срабатывает при ручном переключении)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'control_entity_change'
+      sequence:
+        - service: "input_boolean.turn_{{ trigger.to_state.state }}"
+          data: 
+            entity_id: !input manual_lock_helper 
+        
+    # =======================================================
+    # 1. АВТОМАТИЧЕСКОЕ ВКЛЮЧЕНИЕ (Движение ON или Дверь Open)
+    # =======================================================
+    - conditions:
+        - condition: or
+          conditions:
+            # Движение ON (только ночью)
+            - condition: and
+              conditions:
+                - condition: trigger
+                  id: 'motion_on'
+                - condition: or
+                  conditions:
+                    - condition: time
+                      before: !input schedule_start_time
+                    - condition: time
+                      after: !input schedule_end_time
+            # Дверь Open (КРУГЛОСУТОЧНО)
+            - condition: trigger
+              id: 'door_open'
+        
+        - condition: state
+          entity_id: !input control_entity
+          state: 'off'
+        - condition: state
+          entity_id: !input manual_lock_helper
+          state: 'off'
+      sequence:
+        - service: homeassistant.turn_on 
+          data: 
+            entity_id: !input control_entity
+          
+    # =======================================================
+    # 2. АВТОМАТИЧЕСКОЕ ВЫКЛЮЧЕНИЕ (Только Ночью)
+    # =======================================================
+    - conditions:
+        - condition: or
+          conditions:
+            - condition: trigger
+              id: 'motion_off'
+            - condition: trigger
+              id: 'door_close'
+        # Условие 1: Сейчас Ночь (21:00-08:00)
+        - condition: or
+          conditions:
+            - condition: time
+              before: !input schedule_start_time
+            - condition: time
+              after: !input schedule_end_time
+        - condition: state
+          entity_id: !input control_entity
+          state: 'on'
+        - condition: state
+          entity_id: !input manual_lock_helper
+          state: 'off'
+      sequence:
+        - delay: 
+            minutes: !input motion_off_delay
+        
+        - choose:
+          - conditions:
+              # Проверка 1: Нет движения
+              - condition: state
+                entity_id: !input motion_sensor
+                state: 'off'
+              # Проверка 2: Дверь закрыта
+              - condition: state
+                entity_id: !input door_sensor
+                state: 'off'
+              # Проверка 3: Свет все еще ON
+              - condition: state
+                entity_id: !input control_entity
+                state: 'on'
+              # Проверка 4: Флаг все еще OFF
+              - condition: state
+                entity_id: !input manual_lock_helper
+                state: 'off'
+            sequence:
+              - service: homeassistant.turn_off
+                data: 
+                  entity_id: !input control_entity
+
+    # =======================================================
+    # 3. ОБРАБОТКА ВРЕМЕНИ (Передача управления выключателю)
+    # =======================================================
+    
+    # 3.1: НАЧАЛО ДНЕВНОГО РЕЖИМА (08:00)
+    - conditions:
+        - condition: trigger
+          id: 'day_mode_start'
+        - condition: state
+          entity_id: !input control_entity
+          state: 'on'
+        - condition: state
+          entity_id: !input manual_lock_helper
+          state: 'off'
+      sequence:
+        - service: homeassistant.turn_off
+          data: 
+            entity_id: !input control_entity
+          
+    # 3.2: НАЧАЛО НОЧНОГО РЕЖИМА (21:00)
+    - conditions:
+        - condition: trigger
+          id: 'night_mode_start'
+      sequence: []
+          
+    default: []

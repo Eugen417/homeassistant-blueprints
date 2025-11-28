@@ -1,0 +1,141 @@
+id: single_light_door_priority
+alias: Управление Светом- Дверь и Ручной Приоритет
+
+blueprint:
+  name: 🚪 Свет- Дверь + Ручной Приоритет (24/7)
+  description: |
+    Включает свет при открытии двери и выключает его через заданную задержку после закрытия.
+    
+    **Приоритет:** Включение света вручную (физическим выключателем) блокирует автоматическое выключение.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/swet_2.yaml
+  
+  input:
+    control_entity:
+      name: 💡 Целевой Выключатель/Светильник
+      description: Сущность реле или умной лампочки, которой управляет HA.
+      selector:
+        entity:
+          domain: [light, switch]
+            
+    door_sensor:
+      name: 🚪 Датчик Открытия
+      description: Сенсор двери/окна, который активирует свет.
+      selector:
+        entity:
+          domain: binary_sensor
+          
+    off_delay:
+      name: ⏱️ Задержка выключения (мин)
+      description: Задержка выключения света после закрытия двери.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: min
+          mode: slider
+          
+    manual_lock_helper:
+      name: 🚩 Флаг Ручной Блокировки (Input Boolean)
+      description: |
+        **ОБЯЗАТЕЛЬНО:** Помощник типа "Переключатель" (Input Boolean). Он отслеживает, был ли свет включен/выключен вручную.
+      selector:
+        entity:
+          domain: input_boolean
+          
+mode: restart
+
+trigger:
+  # 1. ТРИГГЕР: Открытие двери (ВКЛЮЧЕНИЕ)
+  - platform: state
+    entity_id: !input door_sensor
+    to: 'on'
+    id: 'door_open'
+
+  # 2. ТРИГГЕР: Закрытие двери (ЗАПУСК ЗАДЕРЖКИ)
+  - platform: state
+    entity_id: !input door_sensor
+    to: 'off'
+    id: 'door_close'
+
+  # 3. ТРИГГЕР: Отслеживание ручного изменения состояния целевой сущности
+  - platform: state
+    entity_id: !input control_entity
+    to: ['on', 'off']
+    id: 'control_entity_change'
+
+action:
+  - choose:
+    
+    # =======================================================
+    # 0. УПРАВЛЕНИЕ ФЛАГОМ БЛОКИРОВКИ (Срабатывает ТОЛЬКО при ручном переключении)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'control_entity_change'
+        # Фильтр: Флаг срабатывает, только если действие было инициировано пользователем.
+        - condition: template
+          value_template: "{{ trigger.to_state.context.user_id is not none }}"
+      sequence:
+        # Устанавливает флаг в ON, если свет включен, и в OFF, если выключен.
+        - service: "input_boolean.turn_{{ trigger.to_state.state }}"
+          data: 
+            entity_id: !input manual_lock_helper 
+        
+    # =======================================================
+    # 1. АВТОМАТИЧЕСКОЕ ВКЛЮЧЕНИЕ (Дверь Open, 24/7)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'door_open'
+        - condition: state
+          entity_id: !input control_entity
+          state: 'off'
+        # Проверка, что нет ручной блокировки
+        - condition: state
+          entity_id: !input manual_lock_helper
+          state: 'off'
+      sequence:
+        - service: homeassistant.turn_on 
+          data: 
+            entity_id: !input control_entity
+          
+    # =======================================================
+    # 2. АВТОМАТИЧЕСКОЕ ВЫКЛЮЧЕНИЕ (Дверь Close, 24/7)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'door_close'
+        - condition: state
+          entity_id: !input control_entity
+          state: 'on'
+        # Проверка, что нет ручной блокировки
+        - condition: state
+          entity_id: !input manual_lock_helper
+          state: 'off'
+      sequence:
+        - delay: 
+            minutes: !input off_delay
+        
+        # Финальная проверка после задержки
+        - choose:
+          - conditions:
+              # Проверка 1: Дверь остается закрытой
+              - condition: state
+                entity_id: !input door_sensor
+                state: 'off'
+              # Проверка 2: Свет все еще ON
+              - condition: state
+                entity_id: !input control_entity
+                state: 'on'
+              # Проверка 3: Флаг все еще OFF (Не было ручного вмешательства)
+              - condition: state
+                entity_id: !input manual_lock_helper
+                state: 'off'
+            sequence:
+              - service: homeassistant.turn_off
+                data: 
+                  entity_id: !input control_entity
+
+    default: []

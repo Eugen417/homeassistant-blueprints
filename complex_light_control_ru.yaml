@@ -7,6 +7,7 @@ blueprint:
     Включает свет по движению/двери только в "Ночное" время.
     Автоматическое выключение блокируется, если свет был включен вручную (физическим выключателем).
   domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/complex_light_control_ru.yaml
   
   input:
     control_entity:

@@ -1,0 +1,158 @@
+id: simple_light_schedule_presence
+alias: Управление Светом- Расписание и Присутствие
+
+blueprint:
+  name: 💡 Свет- Расписание + Датчик Присутствия
+  description: |
+    Автоматизация переключает режимы:
+    1. **ДЕНЬ (8:00-21:00):** Свет включается по расписанию и остается ON.
+    2. **НОЧЬ (21:00-8:00):** Свет включается/выключается по датчику присутствия с задержкой.
+    
+    **Внимание:** Во время "Дневного" режима датчик присутствия игнорируется.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/swet_1.yaml
+  
+  input:
+    control_entity:
+      name: 💡 Целевой Выключатель/Светильник
+      description: Сущность реле или умной лампочки, которой управляет HA.
+      selector:
+        entity:
+          domain: [light, switch]
+            
+    presence_sensor:
+      name: 🧍 Датчик Присутствия
+      description: Сенсор присутствия для активации света в ночном режиме.
+      selector:
+        entity:
+          domain: binary_sensor
+          
+    off_delay:
+      name: ⏱️ Задержка выключения (мин)
+      description: Задержка выключения света после прекращения присутствия (только ночью).
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: min
+          mode: slider
+          
+    day_start_time:
+      name: ⏰ Начало "Дневного" режима (8:00)
+      default: '08:00:00'
+      selector:
+        time:
+        
+    night_start_time:
+      name: ⏰ Начало "Ночного" режима (21:00)
+      default: '21:00:00'
+      selector:
+        time:
+          
+mode: restart
+
+trigger:
+  # 1. ВРЕМЯ: Начало Дневного режима
+  - platform: time
+    at: !input day_start_time
+    id: 'day_start'
+  # 2. ВРЕМЯ: Начало Ночного режима
+  - platform: time
+    at: !input night_start_time
+    id: 'night_start'
+
+  # 3. ДАТЧИК: Присутствие обнаружено
+  - platform: state
+    entity_id: !input presence_sensor
+    to: 'on'
+    id: 'presence_on'
+    
+  # 4. ДАТЧИК: Присутствие отсутствует
+  - platform: state
+    entity_id: !input presence_sensor
+    to: 'off'
+    id: 'presence_off'
+
+action:
+  - choose:
+    
+    # =======================================================
+    # 0. НАЧАЛО ДНЕВНОГО РЕЖИМА (Day Start - 8:00)
+    # =======================================================
+    # Включает свет в 8:00
+    - conditions:
+        - condition: trigger
+          id: 'day_start'
+      sequence:
+        - service: homeassistant.turn_on
+          data: 
+            entity_id: !input control_entity
+          
+    # =======================================================
+    # 1. НАЧАЛО НОЧНОГО РЕЖИМА (Night Start - 21:00)
+    # =======================================================
+    # Выключает свет в 21:00, чтобы передать управление датчику
+    - conditions:
+        - condition: trigger
+          id: 'night_start'
+      sequence:
+        - service: homeassistant.turn_off
+          data: 
+            entity_id: !input control_entity
+          
+    # =======================================================
+    # 2. ВКЛЮЧЕНИЕ ПО ДАТЧИКУ (ТОЛЬКО НОЧЬЮ)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'presence_on'
+        # Условие: Сейчас Ночь (до 8:00 ИЛИ после 21:00)
+        - condition: or
+          conditions:
+            - condition: time
+              before: !input day_start_time
+            - condition: time
+              after: !input night_start_time
+      sequence:
+        - service: homeassistant.turn_on
+          data: 
+            entity_id: !input control_entity
+
+    # =======================================================
+    # 3. ВЫКЛЮЧЕНИЕ ПО ДАТЧИКУ (ТОЛЬКО НОЧЬЮ)
+    # =======================================================
+    - conditions:
+        - condition: trigger
+          id: 'presence_off'
+        # Условие: Сейчас Ночь (Игнорирует выключение в дневное время)
+        - condition: or
+          conditions:
+            - condition: time
+              before: !input day_start_time
+            - condition: time
+              after: !input night_start_time
+        - condition: state
+          entity_id: !input control_entity
+          state: 'on'
+      sequence:
+        - delay: 
+            minutes: !input off_delay
+        
+        # Проверка после задержки: нужно убедиться, что свет не включился снова
+        - choose:
+          - conditions:
+              # Проверка 1: Присутствие все еще отсутствует
+              - condition: state
+                entity_id: !input presence_sensor
+                state: 'off'
+              # Проверка 2: Свет все еще ON
+              - condition: state
+                entity_id: !input control_entity
+                state: 'on'
+            sequence:
+              - service: homeassistant.turn_off
+                data: 
+                  entity_id: !input control_entity
+
+    default: []

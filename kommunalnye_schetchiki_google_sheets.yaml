@@ -1,8 +1,8 @@
-blueprint: 
-  name: 📄 Запись коммунальных расходов в Google Sheets + Telegram
+blueprint:
+  name: 📄 Запись коммунальных расходов в Google Sheets + Telegram (FIXED_v1.2)
   description: 'Ежемесячно (в выбранный день) записывает показания счетчиков ХВС, ГВС, Электроэнергии, Газа и Тепла за **предыдущий месяц** в Google Sheets и отправляет уведомление в Telegram. Запуск всегда происходит в 00:00:01.'
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/kommunalnye_schetchiki_google_sheets.yaml
+  source_url: https://github.com/Eugen417/homeassistant-blueprints/blob/main/kommunalnye_schetchiki_google_sheets.yaml
   
   input:
     # 1. СЕНСОРЫ СЧЕТЧИКОВ И ИХ НОМЕРА
@@ -180,6 +180,36 @@ blueprint:
 # =======================================================================
 # АВТОМАТИЗАЦИЯ
 # =======================================================================
+
+# ВАЖНО: Объявляем переменные inputs здесь, чтобы они были видны в condition
+variables:
+  input_execution_day: !input execution_day
+  
+  input_sensor_hvs_1: !input sensor_hvs_1
+  input_sensor_hvs_2: !input sensor_hvs_2
+  input_sensor_gvs_1: !input sensor_gvs_1
+  input_sensor_gvs_2: !input sensor_gvs_2
+  input_sensor_t1: !input sensor_t1
+  input_sensor_t2: !input sensor_t2
+  input_sensor_t3: !input sensor_t3
+  input_sensor_gas: !input sensor_gas
+  input_sensor_heat: !input sensor_heat
+  
+  input_meter_number_hvs_1: !input meter_number_hvs_1
+  input_meter_number_hvs_2: !input meter_number_hvs_2
+  input_meter_number_gvs_1: !input meter_number_gvs_1
+  input_meter_number_gvs_2: !input meter_number_gvs_2
+  input_meter_number_t1: !input meter_number_t1
+  input_meter_number_t2: !input meter_number_t2
+  input_meter_number_t3: !input meter_number_t3
+  input_meter_number_gas: !input meter_number_gas
+  input_meter_number_heat: !input meter_number_heat
+  
+  input_google_sheets_config: !input google_sheets_config
+  input_google_sheets_worksheet: !input google_sheets_worksheet
+  input_telegram_target: !input telegram_notify_target
+  input_sheets_link: !input sheets_link
+
 trigger:
   # 1. ТРИГГЕР: Срабатывает каждый день в 00:00:01
   - platform: time
@@ -190,45 +220,21 @@ condition:
   # ИЛИ что выбранный день слишком большой, но сегодня последний день месяца.
   - condition: template
     value_template: >
-      {# Определяем переменную input_execution_day, чтобы использовать ее в шаблоне #}
+      {# Теперь input_execution_day доступна здесь, так как она объявлена в variables выше #}
       {% set chosen_day = input_execution_day | int(1) %}
       {% set current_day = now().day %}
-      {# Вычисляем последний день текущего месяца #}
-      {% set last_day_of_month = (now() + timedelta(days=1)).replace(day=1) - timedelta(days=1) %}
+      
+      {# Надежный способ найти последний день текущего месяца #}
+      {# Берем 28 число текущего месяца, прибавляем 4 дня (попадаем в след. месяц), #}
+      {# берем 1 число след месяца и вычитаем 1 день. #}
+      {% set next_month_start = (now().replace(day=28) + timedelta(days=4)).replace(day=1) %}
+      {% set last_day_of_month = (next_month_start - timedelta(days=1)).day %}
 
-      {{ current_day == chosen_day or (chosen_day > last_day_of_month.day and current_day == last_day_of_month.day) }}
+      {{ current_day == chosen_day or (chosen_day > last_day_of_month and current_day == last_day_of_month) }}
     
 action:
-  # 0. ОПРЕДЕЛЕНИЕ ПЕРЕМЕННЫХ
+  # 0. ОПРЕДЕЛЕНИЕ ПЕРЕМЕННЫХ ЗНАЧЕНИЙ (логика вычислений)
   - variables:
-      # 1. Определяем все входные данные как переменные
-      input_sensor_hvs_1: !input sensor_hvs_1
-      input_sensor_hvs_2: !input sensor_hvs_2
-      input_sensor_gvs_1: !input sensor_gvs_1
-      input_sensor_gvs_2: !input sensor_gvs_2
-      input_sensor_t1: !input sensor_t1
-      input_sensor_t2: !input sensor_t2
-      input_sensor_t3: !input sensor_t3
-      input_sensor_gas: !input sensor_gas
-      input_sensor_heat: !input sensor_heat
-      
-      input_meter_number_hvs_1: !input meter_number_hvs_1
-      input_meter_number_hvs_2: !input meter_number_hvs_2
-      input_meter_number_gvs_1: !input meter_number_gvs_1
-      input_meter_number_gvs_2: !input meter_number_gvs_2
-      input_meter_number_t1: !input meter_number_t1
-      input_meter_number_t2: !input meter_number_t2
-      input_meter_number_t3: !input meter_number_t3
-      input_meter_number_gas: !input meter_number_gas
-      input_meter_number_heat: !input meter_number_heat
-      
-      input_google_sheets_config: !input google_sheets_config
-      input_google_sheets_worksheet: !input google_sheets_worksheet
-      input_telegram_target: !input telegram_notify_target
-      input_sheets_link: !input sheets_link
-      
-      input_execution_day: !input execution_day # НОВОЕ: Переменная для дня запуска
-      
       # 2. Вычисляем значения счетчиков
       # ХВС
       hvs1: "{{ states(input_sensor_hvs_1) | float(0) if input_sensor_hvs_1 is not none else '' }}"

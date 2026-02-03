@@ -1,11 +1,12 @@
 blueprint:
-  name: "Уведомление Прогноз о метио осадках и отрицательных температурах"
+  name: "Уведомление Прогноз о метио осадках и отрицательных температурах v1.1"
   description: >
     Отправляет прогноз погоды (интервалы осадков, советы).
     Позволяет выбирать получателей Telegram из списка сущностей (как в отчете по батареям).
   domain: automation
   
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
+  
   input:
     # --- ГЛАВНЫЕ НАСТРОЙКИ ---
     weather_entity:
@@ -24,7 +25,7 @@ blueprint:
 
     telegram_notify_target:
       name: "💬 Целевые уведомления Telegram"
-      description: Выберите сущности Telegram (notify.telegram_...), ID.
+      description: Выберите сущности Telegram (notify.telegram_...), скрипт сам найдет ID.
       default:
         entity_id: []
       selector:
@@ -71,7 +72,7 @@ blueprint:
     
     txt_freeze_alert:
       name: "Совет: Сильный мороз"
-      default: "🥶 <b>Бррр, дубак! Одевайтесь как капуста!</b>"
+      default: "🧣 <b>На улице серьезный минус! Одевайтесь как капуста!</b>"
     txt_cool_alert:
       name: "Совет: Прохладно"
       default: "🧥 <b>Прохладно, не забудьте шапку.</b>"
@@ -83,16 +84,14 @@ variables:
   weather_entity: !input weather_entity
   telegram_notify_target: !input telegram_notify_target
   
-  # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID (КАК В BATTERY REPORT) ---
+  # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ---
   target_chat_ids: >-
     {% set selected_entities_raw = telegram_notify_target.entity_id | default([]) %}
     {% set selected_entities = [selected_entities_raw] | flatten %}
-    {# Берем хвост названия сущности (после последнего подчеркивания) как ID #}
     {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
     {% set ns = namespace(target_ids=[]) %}
     {% for id_string in chat_id_strings %}
       {% set cleaned_id = id_string | string | trim %}
-      {# Если ID длинный и без минуса - добавляем минус (для групп) #}
       {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
         {% set id_with_hyphen = '-' ~ cleaned_id %}
         {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
@@ -122,7 +121,6 @@ trigger:
     at: !input trigger_time
 
 action:
-  # Проверка: выбраны ли получатели?
   - if:
       - condition: template
         value_template: "{{ target_chat_ids | length == 0 }}"
@@ -213,7 +211,7 @@ action:
           message: >
             {%- set current = daily_weather_data[weather_entity].forecast[0] -%}
             Доброе утро!
-            {{'\n'}}Осадков не ожидается.
+            {{'\n'}}Осадков не ожидается{% if current.temperature < 0 %}, но давайте проверим градусник.{% else %}.{% endif %}
             Сейчас на улице: <b>{{ current.temperature }}°C</b>.
             
             {%- if current.temperature < limit_cold -%}

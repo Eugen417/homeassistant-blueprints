@@ -1,0 +1,226 @@
+blueprint:
+  name: "Уведомление Прогноз о метио осадках и отрицательных температурах"
+  description: >
+    Отправляет прогноз погоды (интервалы осадков, советы).
+    Позволяет выбирать получателей Telegram из списка сущностей (как в отчете по батареям).
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
+  input:
+    # --- ГЛАВНЫЕ НАСТРОЙКИ ---
+    weather_entity:
+      name: "Погодная сущность"
+      description: Ваш weather.yandex_pogoda или OpenMeteo
+      selector:
+        entity:
+          domain: weather
+    
+    trigger_time:
+      name: "Время отправки"
+      description: Во сколько бот пришлет сообщение (например 07:00)
+      default: "07:00:00"
+      selector:
+        time: {}
+
+    # ТОТ САМЫЙ СЕЛЕКТОР (КАК В ПРИМЕРЕ)
+    telegram_notify_target:
+      name: "💬 Целевые уведомления Telegram"
+      description: Выберите сущности Telegram (notify.telegram_...), скрипт сам найдет ID.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    # --- НАСТРОЙКИ ТЕКСТОВ ---
+    txt_rain:
+      name: "Текст: Дождь"
+      default: "Дождь 🌧"
+    txt_pouring:
+      name: "Текст: Ливень"
+      default: "Ливень ⛈"
+    txt_snow:
+      name: "Текст: Снег"
+      default: "Снег ❄️"
+    txt_snow_rain:
+      name: "Текст: Снег с дождем"
+      default: "Снег с дождем 💧❄️"
+    txt_lightning:
+      name: "Текст: Гроза"
+      default: "Гроза ⚡️"
+    txt_hail:
+      name: "Текст: Град"
+      default: "Град 🌨"
+    
+    # --- СОВЕТЫ ---
+    txt_umbrella:
+      name: "Совет: Взять зонт"
+      default: "☔️ <b>Не забудьте взять зонт!</b>"
+    txt_warm:
+      name: "Совет: Одеться теплее"
+      default: "🧣 <b>Одевайтесь теплее!</b>"
+    
+    cold_threshold:
+      name: "Порог сильного мороза (°C)"
+      default: -15
+      selector:
+        number:
+          min: -50
+          max: 0
+          unit_of_measurement: "°C"
+    
+    txt_freeze_alert:
+      name: "Совет: Сильный мороз"
+      default: "🥶 <b>Бррр, дубак! Одевайтесь как капуста!</b>"
+    txt_cool_alert:
+      name: "Совет: Прохладно"
+      default: "🧥 <b>Прохладно, не забудьте шапку.</b>"
+    txt_good_day:
+      name: "Текст: Хороший день"
+      default: "Хорошего дня!"
+
+variables:
+  weather_entity: !input weather_entity
+  telegram_notify_target: !input telegram_notify_target
+  
+  # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID (КАК В BATTERY REPORT) ---
+  target_chat_ids: >-
+    {% set selected_entities_raw = telegram_notify_target.entity_id | default([]) %}
+    {% set selected_entities = [selected_entities_raw] | flatten %}
+    {# Берем хвост названия сущности (после последнего подчеркивания) как ID #}
+    {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+    {% set ns = namespace(target_ids=[]) %}
+    {% for id_string in chat_id_strings %}
+      {% set cleaned_id = id_string | string | trim %}
+      {# Если ID длинный и без минуса - добавляем минус (для групп) #}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set id_with_hyphen = '-' ~ cleaned_id %}
+        {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.target_ids }}
+
+  # Переменные текстов
+  t_rain: !input txt_rain
+  t_pouring: !input txt_pouring
+  t_snow: !input txt_snow
+  t_snow_rain: !input txt_snow_rain
+  t_lightning: !input txt_lightning
+  t_hail: !input txt_hail
+  
+  adv_umbrella: !input txt_umbrella
+  adv_warm: !input txt_warm
+  adv_freeze: !input txt_freeze_alert
+  adv_cool: !input txt_cool_alert
+  adv_good: !input txt_good_day
+  limit_cold: !input cold_threshold
+
+trigger:
+  - platform: time
+    at: !input trigger_time
+
+action:
+  # Проверка: выбраны ли получатели?
+  - if:
+      - condition: template
+        value_template: "{{ target_chat_ids | length == 0 }}"
+    then:
+      - stop: "Не выбраны получатели Telegram"
+
+  - action: weather.get_forecasts
+    target:
+      entity_id: !input weather_entity
+    data:
+      type: hourly
+    response_variable: daily_weather_data
+
+  - if:
+      - condition: template
+        value_template: >
+          {% set forecast = daily_weather_data[weather_entity].forecast %}
+          {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
+          {{ forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}
+    
+    # === ВЕТКА 1: ОСАДКИ ЕСТЬ ===
+    then:
+      - action: telegram_bot.send_message
+        metadata: {}
+        data:
+          target: "{{ target_chat_ids }}"
+          parse_mode: html
+          title: "🌨 Прогноз погоды"
+          message: >
+            {%- set forecast = daily_weather_data[weather_entity].forecast -%}
+            {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+            {%- set wet_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] -%}
+            {%- set mapper = {
+              'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning,
+              'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail
+            } -%}
+            
+            <b>Внимание, ожидаются осадки (24ч):</b>
+            {%- set ns = namespace(blocks=[], current_block=[]) -%}
+            {%- for hour in forecast[:24] if hour.condition in bad_weather -%}
+              {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
+              {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
+                {%- set ns.current_block = ns.current_block + [hour] -%}
+              {%- else -%}
+                {%- if ns.current_block -%}
+                  {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+                {%- endif -%}
+                {%- set ns.current_block = [hour] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if ns.current_block -%}
+              {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+            {%- endif -%}
+            
+            {%- for block in ns.blocks -%}
+              {%- set start = block[0] -%}
+              {%- set end = block[-1] -%}
+              {%- set c_name = mapper[start.condition] if start.condition in mapper else start.condition -%}
+              {%- if start == end -%}
+            {{'\n'}}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}</b> — {{ c_name }} ({{ start.temperature }}°C)
+              {%- else -%}
+                {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
+            {{'\n'}}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }}</b> — {{ c_name }} ({{ start.temperature }}°C)
+              {%- endif -%}
+            {%- endfor -%}
+            
+            {{'\n\n'}}
+            {%- set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) | list | count > 0 -%}
+            {%- if has_rain -%}
+            {{ adv_umbrella }}
+            {%- else -%}
+            {{ adv_warm }}
+            {%- endif -%}
+
+    # === ВЕТКА 2: ОСАДКОВ НЕТ ===
+    else:
+      - action: telegram_bot.send_message
+        metadata: {}
+        data:
+          target: "{{ target_chat_ids }}"
+          parse_mode: html
+          title: >
+            {% set t = daily_weather_data[weather_entity].forecast[0].temperature %}
+            {% if t < limit_cold %} 🥶 Бррр, дубак!
+            {% elif t < 0 %} ❄️ Морозно
+            {% else %} ☀️ Хорошая погода
+            {% endif %}
+          message: >
+            {%- set current = daily_weather_data[weather_entity].forecast[0] -%}
+            Доброе утро!
+            {{'\n'}}Осадков не ожидается.
+            Сейчас на улице: <b>{{ current.temperature }}°C</b>.
+            
+            {%- if current.temperature < limit_cold -%}
+            {{ adv_freeze }}
+            {%- elif current.temperature < -5 -%}
+            {{ adv_cool }}
+            {%- else -%}
+            {{ adv_good }}
+            {%- endif -%}

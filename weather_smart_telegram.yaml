@@ -25,7 +25,7 @@ blueprint:
 
     telegram_notify_target:
       name: "💬 Целевые уведомления Telegram"
-      description: Выберите сущности Telegram (notify.telegram_...), скрипт сам найдет ID.
+      description: Выберите сущности Telegram (notify.telegram_...), ID.
       default:
         entity_id: []
       selector:

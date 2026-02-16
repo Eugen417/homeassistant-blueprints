@@ -1,0 +1,99 @@
+blueprint:
+  name: Запись по движению + Уведомление (Final)
+  description: >
+    При обнаружении движения делает скриншот, записывает видео и 
+    отправляет уведомление на выбранное мобильное устройство.
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/video_push_notifi_ru.yaml
+  
+  input:
+    motion_sensor:
+      name: Датчик движения
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    target_camera:
+      name: Камера
+      selector:
+        entity:
+          domain: camera
+    notify_device:
+      name: Телефон для уведомлений
+      description: Выберите устройство, на которое установлено приложение Home Assistant.
+      selector:
+        device:
+          integration: mobile_app
+    recording_duration:
+      name: Длительность записи (сек)
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 60
+          unit_of_measurement: seconds
+
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+
+action:
+  # ----------------------------------------------------------------
+  # 1. ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
+  # ----------------------------------------------------------------
+  - variables:
+      # ВАЖНО: Переносим input камеры в переменную для использования в шаблонах
+      camera_entity: !input target_camera
+      
+      # Генерируем уникальное имя файла на основе времени
+      filename: "motion_{{ now().strftime('%Y%m%d_%H%M%S') }}"
+      
+      # Пути для сохранения (внутренние, для Home Assistant)
+      path_snap: "/config/www/snapshots/{{ filename }}.jpg"
+      path_clip: "/config/www/clips/{{ filename }}.mp4"
+      
+      # Ссылки для уведомления (внешние, для телефона)
+      url_snap: "/local/snapshots/{{ filename }}.jpg"
+      url_clip: "/local/clips/{{ filename }}.mp4"
+      
+      # Получаем красивое имя камеры
+      camera_name: "{{ state_attr(camera_entity, 'friendly_name') or 'Камера' }}"
+
+  # ----------------------------------------------------------------
+  # 2. ДЕЙСТВИЯ
+  # ----------------------------------------------------------------
+  
+  # Скриншот
+  - action: camera.snapshot
+    target:
+      entity_id: !input target_camera
+    data:
+      filename: "{{ path_snap }}"
+
+  # Запись видео
+  - action: camera.record
+    target:
+      entity_id: !input target_camera
+    data:
+      filename: "{{ path_clip }}"
+      duration: !input recording_duration
+      lookback: 0
+
+  # Уведомление на телефон
+  # Используем domain: mobile_app для прямой отправки на Device ID
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    message: "Движение зафиксировано!"
+    title: "Тревога: {{ camera_name }}"
+    data:
+      image: "{{ url_snap }}"
+      video: "{{ url_clip }}"
+      clickAction: "{{ url_clip }}"
+      url: "{{ url_clip }}" 
+      ttl: 0
+      priority: high

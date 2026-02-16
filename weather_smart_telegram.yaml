@@ -1,11 +1,8 @@
 blueprint:
-  name: "Уведомление Прогноз о метео осадках и отрицательных температурах v1.1"
+  name: "Уведомление Прогноз о метео + Карта v1.2"
   description: >
-    Отправляет прогноз погоды (интервалы осадков, советы).
-    Позволяет выбирать получателей Telegram из списка сущностей (как в отчете по батареям).
+    Отправляет прогноз погоды и ссылку на карту осадков (текстовой ссылкой).
   domain: automation
-  
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
   
   input:
     # --- ГЛАВНЫЕ НАСТРОЙКИ ---
@@ -18,20 +15,29 @@ blueprint:
     
     trigger_time:
       name: "Время отправки"
-      description: Во сколько бот пришлет сообщение (например 07:00)
       default: "07:00:00"
       selector:
         time: {}
 
     telegram_notify_target:
       name: "💬 Целевые уведомления Telegram"
-      description: Выберите сущности Telegram (notify.telegram_...), ID.
+      description: Выберите сущности Telegram (notify.telegram_...).
       default:
         entity_id: []
       selector:
         target:
           entity:
             - domain: notify
+
+    # --- ССЫЛКА НА КАРТУ ---
+    map_url:
+      name: "Ссылка на карту осадков"
+      description: >
+        Вставьте сюда ЧИСТУЮ ссылку (https://...). Без <iframe...>.
+        Настроить и получить ссылку можно тут: https://embed.windy.com/config/map
+      default: ""
+      selector:
+        text: {}
 
     # --- НАСТРОЙКИ ТЕКСТОВ ---
     txt_rain:
@@ -83,6 +89,7 @@ blueprint:
 variables:
   weather_entity: !input weather_entity
   telegram_notify_target: !input telegram_notify_target
+  map_link: !input map_url
   
   # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ---
   target_chat_ids: >-
@@ -187,13 +194,16 @@ action:
               {%- endif -%}
             {%- endfor -%}
             
-            {{'\n\n'}}
+            {{'\n'}}
             {%- set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) | list | count > 0 -%}
             {%- if has_rain -%}
             {{ adv_umbrella }}
             {%- else -%}
             {{ adv_warm }}
             {%- endif -%}
+            {% if map_link != '' %}
+            {{'\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
+            {% endif %}
 
     # === ВЕТКА 2: ОСАДКОВ НЕТ ===
     else:
@@ -221,3 +231,6 @@ action:
             {%- else -%}
             {{ adv_good }}
             {%- endif -%}
+            {% if map_link != '' %}
+            {{'\n\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
+            {% endif %}

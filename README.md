@@ -47,7 +47,7 @@ Collection of blueprints and scripts for Home Assistant.
 | File | Description | Install |
 | :--- | :--- | :---: |
 | **person_tracker_RU.yaml** | **[RU]** Трекер персон. Отслеживание входа/выхода из зон. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fperson_tracker_RU.yaml) |
-| **cover_collision_protect.yaml** | **[RU]** Защита вертикальных жалюзи от поломки поворот/раздвижения. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fcover_collision_protect.yaml) |
+| **cover_collision_protect.yaml** | **[RU]** Защита вертикальных жалюзи от поломки, поворот/раздвижение. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fcover_collision_protect.yaml) |
 
 ---
 

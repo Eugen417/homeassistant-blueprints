@@ -1,0 +1,138 @@
+blueprint:
+  name: "Оповещение: Осадки (Активная проверка)"
+  description: >
+    Проверяет погоду каждые X минут. Если в ближайшие 3 часа ожидаются осадки — шлет уведомление.
+    Использует weather.get_forecasts.
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_3hr_meteoosadki_telegram-report.yaml
+
+  input:
+    weather_entity:
+      name: "Погодная сущность"
+      description: Ваш weather.yandex_pogoda или OpenMeteo
+      selector:
+        entity:
+          domain: weather
+
+    check_pattern:
+      name: "Интервал проверки (минуты)"
+      description: "Формат time_pattern. Например '/30' — каждые 30 минут."
+      default: "/30"
+      selector:
+        text: {}
+
+    telegram_notify_target:
+      name: "💬 Получатель Telegram"
+      description: Выберите сущность уведомлений (notify.telegram_...). Скрипт сам найдет Chat ID.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    map_url:
+      name: "Ссылка на карту (Windy)"
+      description: "Ссылка для открытия карты внизу сообщения."
+      default: "https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=55.672&lon=37.855"
+      selector:
+        text: {}
+
+variables:
+  weather_entity: !input weather_entity
+  telegram_notify_target: !input telegram_notify_target
+  map_link: !input map_url
+
+  # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ИЗ NOTIFY ENTITY ---
+  target_chat_ids: >-
+    {% set selected_entities_raw = telegram_notify_target.entity_id | default([]) %}
+    {% set selected_entities = [selected_entities_raw] | flatten %}
+    {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+    {% set ns = namespace(target_ids=[]) %}
+    {% for id_string in chat_id_strings %}
+      {% set cleaned_id = id_string | string | trim %}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set id_with_hyphen = '-' ~ cleaned_id %}
+        {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.target_ids }}
+
+trigger:
+  - platform: time_pattern
+    minutes: !input check_pattern
+
+action:
+  # Проверка: есть ли получатели
+  - if:
+      - condition: template
+        value_template: "{{ target_chat_ids | length == 0 }}"
+    then:
+      - stop: "Не выбраны получатели Telegram"
+
+  # Получение прогноза
+  - action: weather.get_forecasts
+    target:
+      entity_id: !input weather_entity
+    data:
+      type: hourly
+    response_variable: weather_data
+
+  # Логика проверки условий
+  - if:
+      - condition: template
+        value_template: >
+          {% set forecast = weather_data[weather_entity].forecast %}
+          {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
+          {# Проверяем только первые 3 часа #}
+          {{ forecast[:3] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}
+    then:
+      - action: telegram_bot.send_message
+        metadata: {}
+        data:
+          target: "{{ target_chat_ids }}"
+          parse_mode: html
+          title: "☔️ Осадки в ближайшее время!"
+          message: >
+            {%- set forecast = weather_data[weather_entity].forecast -%}
+            {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+            {%- set mapper = {
+              'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈',
+              'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'
+            } -%}
+
+            <b>Внимание, прогноз на 3 часа:</b>
+            {%- set ns = namespace(blocks=[], current_block=[]) -%}
+            {%- for hour in forecast[:3] if hour.condition in bad_weather -%}
+              {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
+              {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
+                {%- set ns.current_block = ns.current_block + [hour] -%}
+              {%- else -%}
+                {%- if ns.current_block -%}
+                  {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+                {%- endif -%}
+                {%- set ns.current_block = [hour] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if ns.current_block -%}
+              {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+            {%- endif -%}
+            
+            {%- for block in ns.blocks -%}
+              {%- set start = block[0] -%}
+              {%- set end = block[-1] -%}
+              {%- set c_name = mapper[start.condition] if start.condition in mapper else start.condition -%}
+              {%- if start == end -%}
+            {{'\n'}}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}</b> {{ c_name }} ({{ start.temperature }}°C)
+              {%- else -%}
+                {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
+            {{'\n'}}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }}</b> {{ c_name }} ({{ start.temperature }}°C)
+              {%- endif -%}
+            {%- endfor -%}
+            
+            {% if map_link != '' %}
+            {{'\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
+            {% endif %}

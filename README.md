@@ -20,7 +20,7 @@ Collection of blueprints and scripts for Home Assistant.
 | File | Description | Install |
 | :--- | :--- | :---: |
 | **weather_smart_telegram.yaml** | **[RU]** Умный отчет о погоде в Telegram (базовая версия). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_smart_telegram.yaml) |
-| **weather_smart_3hr_meteoosadki_telegram-report.yaml** | **[RU]** Расширенный погодный отчет в Telegram (прогноз каждые 3 часа + осадки). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_smart_3hr_meteoosadki_telegram-report.yaml) |
+| **weather_smart_3hr_meteoosadki_telegram-report.yaml** | **[RU]** Краткий погодный отчет в Telegram (прогноз каждые 3 часа + осадки). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_smart_3hr_meteoosadki_telegram-report.yaml) |
 
 ## 📊 Notifications & Data / Уведомления и Данные
 

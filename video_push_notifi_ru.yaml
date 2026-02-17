@@ -13,7 +13,10 @@ blueprint:
       selector:
         entity:
           domain: binary_sensor
-          device_class: motion
+          device_class:
+            - motion
+            - presence
+            - occupancymotion
     target_camera:
       name: Камера
       selector:

@@ -1,37 +1,65 @@
-# 🏠 Home Assistant Blueprints
+# 🏠 Home Assistant Blueprints by Eugen417
 
-Коллекция моих блупринтов (шаблонов автоматизаций) и скриптов для Home Assistant.
-Здесь собраны решения для мониторинга батареек, "душевных" уведомлений о погоде и учета коммунальных услуг.
+Коллекция чертежей (blueprints) и скриптов для Home Assistant.
+Collection of blueprints and scripts for Home Assistant.
 
 ---
 
-## 📋 Список блупринтов / Available Blueprints
+## 🔋 Battery & Devices / Питание и Устройства
 
-| Blueprint | Описание / Description | Установка / Install |
+| File | Description | Install |
 | :--- | :--- | :---: |
-| **Battery Report (EN)** | **[EN]** A blueprint to generate detailed battery status reports using the **Battery Notes** integration. It categorizes devices by battery level and type for easy monitoring. | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint URL.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2FBattery_Report_V3.4_EN.yaml) |
-| **Battery Report (RU)** | **[RU]** Генерация подробного отчета о состоянии батареек (версия 3.4). Удобно для отслеживания устройств, требующих замены питания. Работает в паре с интеграцией **Battery Notes**. | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint URL.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2FBattery_Report_V3.4_RU.yaml) |
-| **Battery+ TG Report** | **[RU]** Продвинутый скрипт (Battery+ / Батарея+) для отправки отчетов в Telegram. Группирует устройства по типам и статусу (отдельно "на замену", отдельно "на зарядку"). | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint URL.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fscript_battery_plus_tg_push_report.yaml) |
-| **Weather Notifications** | **[RU]** Автоматизация утренних уведомлений о погоде с «душевными» комментариями. Напомнит взять зонт или одеться как капуста 🧣, если на улице серьезный минус. | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint URL.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_notification.yaml) |
-| **Google Sheets Counters**| **[RU]** Шаблон для автоматизации передачи показаний счетчиков (ЖКУ) напрямую в Google Таблицы для ведения домашней бухгалтерии. | [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint URL.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fkommunalnye_schetchiki_google_sheets.yaml) |
+| **Battery_Report_V3.4_EN.yaml** | **[EN]** Detailed battery report using **Battery Notes**. Categorizes devices by level/type. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2FBattery_Report_V3.4_EN.yaml) |
+| **Battery_Report_V3.4_RU.yaml** | **[RU]** Подробный отчет по батарейкам (**Battery Notes**). Группировка по уровню и типу. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2FBattery_Report_V3.4_RU.yaml) |
+| **script_battery_plus_tg_push_report.yaml** | **[RU]** Скрипт отчета в Telegram (Battery+). Разделяет на «Замена» и «Зарядка». | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fscript_battery_plus_tg_push_report.yaml) |
+| **z2m_offline_detection.yaml** | **[RU]** Мониторинг отвала устройств Zigbee2MQTT (Offline detection). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fz2m_offline_detection.yaml) |
+| **restart_integration_if_device_state_unknown.yaml** | **[RU]** Перезагрузка интеграции, если устройство перешло в статус `unknown` или `unavailable`. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Frestart_integration_if_device_state_unknown.yaml) |
+
+## ⛅ Weather / Погода
+
+| File | Description | Install |
+| :--- | :--- | :---: |
+| **weather_smart_telegram.yaml** | **[RU]** Умный отчет о погоде в Telegram (базовая версия). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_smart_telegram.yaml) |
+| **weather_smart_3hr_meteoosadki_telegram-report.yaml** | **[RU]** Расширенный погодный отчет в Telegram (прогноз каждые 3 часа + осадки). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fweather_smart_3hr_meteoosadki_telegram-report.yaml) |
+
+## 📊 Notifications & Data / Уведомления и Данные
+
+| File | Description | Install |
+| :--- | :--- | :---: |
+| **kommunalnye_schetchiki_google_sheets.yaml** | **[RU]** Отправка показаний счетчиков (ЖКУ) в Google Таблицы. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fkommunalnye_schetchiki_google_sheets.yaml) |
+| **blood_pressure_to_google.yaml** | **[RU]** Логирование давления и пульса в Google Таблицы. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fblood_pressure_to_google.yaml) |
+| **video_push_notifi_ru.yaml** | **[RU]** Отправка уведомления с видео/кадром с камеры наблюдения. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fvideo_push_notifi_ru.yaml) |
+| **new_waterleackdeteckt_tts_push_notifi.yaml** | **[RU]** Уведомление о протечке воды (TTS на колонки + Push на телефон). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fnew_waterleackdeteckt_tts_push_notifi.yaml) |
+| **sensor_state_notify.yaml** | **[RU]** Универсальное уведомление при изменении состояния выбранного сенсора. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fsensor_state_notify.yaml) |
+
+## 💡 Lighting & Climate / Свет и Климат
+
+| File | Description | Install |
+| :--- | :--- | :---: |
+| **gtc_co2_fan_speed_on-off.yaml** | **[RU]** Управление скоростью вентиляции в зависимости от уровня CO2. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fgtc_co2_fan_speed_on-off.yaml) |
+| **complex_light_control_ru.yaml** | **[RU]** Комплексное управление освещением (сценарии, условия). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fcomplex_light_control_ru.yaml) |
+| **swet_1.yaml** | **[RU]** Автоматизация освещения (Вариант 1 - базовый). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fswet_1.yaml) |
+| **swet_2.yaml** | **[RU]** Автоматизация освещения (Вариант 2 - расширенный). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fswet_2.yaml) |
+| **yandex_double_gang_wireless_switch.yaml** | **[RU]** Блупринт для двухклавишного беспроводного выключателя Яндекс. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fyandex_double_gang_wireless_switch.yaml) |
+
+## 🛡️ Security & Other / Безопасность и Прочее
+
+| File | Description | Install |
+| :--- | :--- | :---: |
+| **person_tracker_RU.yaml** | **[RU]** Трекер персон. Отслеживание входа/выхода из зон. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fperson_tracker_RU.yaml) |
+| **cover_collision_protect.yaml** | **[RU]** Защита рулонных штор/жалюзи от столкновения с препятствием. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEugen417%2Fhomeassistant-blueprints%2Fblob%2Fmain%2Fcover_collision_protect.yaml) |
 
 ---
 
-## 🚀 Как установить / How to install
+## 🚀 How to use / Как установить
 
-**Способ 1 (Рекомендуемый):**
-Нажмите кнопку **Import Blueprint** в таблице выше. Ваш Home Assistant откроет диалог импорта автоматически (требуется настроенный `my.home-assistant.io`).
-
-**Способ 2 (Вручную):**
-1. Откройте нужный файл в репозитории.
-2. Скопируйте ссылку на этот файл.
-3. Перейдите в Home Assistant: **Настройки** > **Автоматизации и сцены** > **Чертежи**.
-4. Нажмите кнопку **Импортировать чертеж** и вставьте ссылку.
+Click the **"Import Blueprint"** badge next to the file.
+Нажмите кнопку **"Import Blueprint"** напротив нужного файла.
 
 ---
 
-## ⚠️ Важное примечание / Important Note
+## ⚠️ Important Note / Важно
 
-> **[RU]** При редактировании описаний внутри YAML-файлов избегайте использования двоеточий (`:`) в тексте, так как это может вызвать ошибку парсинга.
+> **[RU]** При редактировании описаний в YAML-файлах **не используйте двоеточия (:)** в тексте без кавычек, это вызывает ошибки синтаксиса.
 >
-> **[EN]** When editing descriptions inside YAML files, avoid using colons (`:`) in the text, as this may cause parsing errors.
+> **[EN]** Avoid using colons (`:`) in YAML descriptions without quotes to prevent syntax errors.

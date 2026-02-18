@@ -53,7 +53,7 @@ Collection of blueprints and scripts for Home Assistant.
 
 ## 🚀 How to use / Как установить
 
-Click the **"Import Blueprint"** badge next to the file.
+Click the **"Import Blueprint"** badge next to the file.  
 Нажмите кнопку **"Import Blueprint"** напротив нужного файла.
 
 ---

@@ -1,8 +1,8 @@
 blueprint:
-  name: "Оповещение: Осадки (Активная проверка) v1.2"
+  name: "Оповещение: Осадки (Активная проверка) v1.3"
   description: >
-    Проверяет погоду по расписанию. Если в ближайшие 3 ЧАСА (будущего времени) ожидаются осадки — шлет уведомление.
-    Фильтрует прошедшее время, чтобы не слать старые прогнозы.
+    Проверяет погоду по расписанию. Если в ближайшие 3 ЧАСА (включая текущий) ожидаются осадки — шлет уведомление.
+    Фильтрует прошедшее время. Исправлена ошибка областей видимости Jinja2.
   domain: automation
 
   input:
@@ -95,16 +95,16 @@ action:
           {% set forecast = weather_data[weather_entity].forecast %}
           {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
           
-          {# 1. Фильтруем часы, которые уже прошли #}
-          {% set future_forecast = [] %}
+          {# 1. Фильтруем часы с использованием namespace. Берем время + 1 час, чтобы не отсечь текущий идущий час #}
+          {% set time_filter = namespace(future_forecast=[]) %}
           {% for h in forecast %}
-            {% if as_timestamp(h.datetime) >= as_timestamp(now()) %}
-              {% set future_forecast = future_forecast + [h] %}
+            {% if (as_timestamp(h.datetime) + 3600) > as_timestamp(now()) %}
+              {% set time_filter.future_forecast = time_filter.future_forecast + [h] %}
             {% endif %}
           {% endfor %}
           
-          {# 2. Проверяем только 3 ближайших часа ИЗ БУДУЩЕГО #}
-          {{ future_forecast[:3] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}
+          {# 2. Проверяем только 3 ближайших часа ИЗ АКТУАЛЬНЫХ #}
+          {{ time_filter.future_forecast[:3] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}
           
     then:
       - action: telegram_bot.send_message
@@ -122,16 +122,16 @@ action:
             } -%}
             
             {# Фильтруем прошлое #}
-            {%- set future_forecast = [] -%}
+            {%- set time_filter = namespace(future_forecast=[]) -%}
             {%- for h in forecast -%}
-              {%- if as_timestamp(h.datetime) >= as_timestamp(now()) -%}
-                {%- set future_forecast = future_forecast + [h] -%}
+              {%- if (as_timestamp(h.datetime) + 3600) > as_timestamp(now()) -%}
+                {%- set time_filter.future_forecast = time_filter.future_forecast + [h] -%}
               {%- endif -%}
             {%- endfor -%}
 
             <b>Внимание, прогноз на 3 часа:</b>
             {%- set ns = namespace(blocks=[], current_block=[]) -%}
-            {%- for hour in future_forecast[:3] if hour.condition in bad_weather -%}
+            {%- for hour in time_filter.future_forecast[:3] if hour.condition in bad_weather -%}
               {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
               {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
                 {%- set ns.current_block = ns.current_block + [hour] -%}

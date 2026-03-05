@@ -1,10 +1,10 @@
 blueprint:
-  name: "\U0001FAAB Скрипт отчета по батареям (v1.0.1)"
+  name: "🔋 Скрипт отчета по батареям (v1.0.2)"
   description: 'Версия скрипта для отчета о состоянии батарей (на основе v3.8.1).
 
 
     Создает отчеты ("Замена", "Зарядка" и "Полный") и отправляет их в Telegram (HTML)
-    или App.
+    или App. Заменен устаревший параметр target на chat_id для Telegram.
 
     В полный отчет включены устройства, потерявшие связь (Unavailable).
 
@@ -16,7 +16,7 @@ blueprint:
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/script_battery_plus_tg_push_report.yaml
   input:
     mobile_notify_target:
-      name: "\U0001F4F1 Мобильное устройство"
+      name: "📱 Мобильное устройство"
       description: Выберите устройство для push-уведомлений. Оставьте пустым, если
         не нужно.
       default: ''
@@ -25,7 +25,7 @@ blueprint:
           integration: mobile_app
           multiple: false
     telegram_notify_target:
-      name: "\U0001F4AC Telegram"
+      name: "💬 Telegram"
       description: Выберите сущности notify.telegram_bot_.... Оставьте пустым, если
         не нужно.
       default:
@@ -36,7 +36,7 @@ blueprint:
           - domain:
             - notify
     send_full_report_option:
-      name: "\U0001F4CA Отправлять Полный отчет?"
+      name: "📊 Отправлять Полный отчет?"
       description: Включите для отправки полного списка (вторым сообщением в Telegram).
       default: false
       selector:
@@ -53,7 +53,7 @@ blueprint:
           unit_of_measurement: '%'
           mode: box
     excluded_sensors:
-      name: "\U0001F5D1️ Исключаемые сенсоры"
+      name: "🗑️ Исключаемые сенсоры"
       description: Сенсоры, которые нужно игнорировать.
       default:
         entity_id: []
@@ -65,7 +65,7 @@ blueprint:
             device_class:
             - battery
     text_disposable_header:
-      name: "\U0001F4DD Заголовок (Замена)"
+      name: "📝 Заголовок (Замена)"
       default: '⚠️ <b>Устройства, требующие замены батареи:</b>
 
         '
@@ -74,21 +74,21 @@ blueprint:
           multiple: false
           multiline: false
     text_disposable_action:
-      name: "\U0001F4DD Шаблон строки (Замена)"
+      name: "📝 Шаблон строки (Замена)"
       default: '<b>%LEVEL%%</b> ♻️ ЗАМЕНА! (Тип: %TYPE%, Кол-во: %QTY%)'
       selector:
         text:
           multiple: false
           multiline: false
     text_disposable_ok:
-      name: "\U0001F4DD Сообщение (Замена не требуется)"
+      name: "📝 Сообщение (Замена не требуется)"
       default: 'Все незаряжаемые батареи имеют заряд выше '
       selector:
         text:
           multiple: false
           multiline: false
     text_rechargeable_header:
-      name: "\U0001F4DD Заголовок (Зарядка)"
+      name: "📝 Заголовок (Зарядка)"
       default: '⚠️ <b>Устройства, требующие подзарядки:</b>
 
         '
@@ -97,113 +97,113 @@ blueprint:
           multiple: false
           multiline: false
     text_rechargeable_action:
-      name: "\U0001F4DD Шаблон строки (Зарядка)"
-      default: "<b>%LEVEL%%</b> \U0001F50C ЗАРЯДКА!"
+      name: "📝 Шаблон строки (Зарядка)"
+      default: "<b>%LEVEL%%</b> 🔌 ЗАРЯДКА!"
       selector:
         text:
           multiple: false
           multiline: false
     text_rechargeable_ok:
-      name: "\U0001F4DD Сообщение (Зарядка не требуется)"
+      name: "📝 Сообщение (Зарядка не требуется)"
       default: 'Все заряжаемые устройства имеют заряд выше '
       selector:
         text:
           multiple: false
           multiline: false
     text_full_replace_label:
-      name: "\U0001F4DD Метка замены (Полный отчет)"
+      name: "📝 Метка замены (Полный отчет)"
       default: ' ♻️ <b>ЗАМЕНА!</b>'
       selector:
         text:
           multiple: false
           multiline: false
     text_full_charge_label:
-      name: "\U0001F4DD Метка зарядки (Полный отчет)"
-      default: " \U0001F50C <b>ЗАРЯДКА!</b>"
+      name: "📝 Метка зарядки (Полный отчет)"
+      default: " 🔌 <b>ЗАРЯДКА!</b>"
       selector:
         text:
           multiple: false
           multiline: false
     text_rechargeable_type:
-      name: "\U0001F4DD Название встроенного АКБ"
+      name: "📝 Название встроенного АКБ"
       default: Встроеный АКБ
       selector:
         text:
           multiple: false
           multiline: false
     text_unknown_type:
-      name: "\U0001F4DD Название неизвестного типа"
+      name: "📝 Название неизвестного типа"
       default: Неизвестный Тип
       selector:
         text:
           multiple: false
           multiline: false
     text_summary_header:
-      name: "\U0001F4DD Заголовок сводки"
-      default: "--- \n\n\U0001F50B <b>Сводка по Типу Батареи:</b>\n"
+      name: "📝 Заголовок сводки"
+      default: "--- \n\n🔋 <b>Сводка по Типу Батареи:</b>\n"
       selector:
         text:
           multiple: false
           multiline: false
     text_grand_total:
-      name: "\U0001F4DD Шаблон общего количества"
+      name: "📝 Шаблон общего количества"
       default: <i>Общее количество контролируемых элементов:</i> <b>%TOTAL%</b> шт.
       selector:
         text:
           multiple: false
           multiline: false
     text_offline_header:
-      name: "\U0001F4DD Заголовок (Offline)"
+      name: "📝 Заголовок (Offline)"
       default: '⚠️ <b>ВНИМАНИЕ: Устройства без связи (Unavailable/Unknown):</b>'
       selector:
         text:
           multiple: false
           multiline: false
     text_no_sensors:
-      name: "\U0001F4DD Сообщение нет сенсоров"
+      name: "📝 Сообщение нет сенсоров"
       default: Сенсоры батарей не найдены.
       selector:
         text:
           multiple: false
           multiline: false
     text_no_summary_data:
-      name: "\U0001F4DD Сообщение нет сводки"
+      name: "📝 Сообщение нет сводки"
       default: Нет данных о типах батарей для отчета.
       selector:
         text:
           multiple: false
           multiline: false
     title_short_replace_low:
-      name: "\U0001F4F1 Заголовок App (Замена, Низкий)"
-      default: "\U0001F50B Батарея+: \U0001FAAB♻️ Заряд &lt; "
+      name: "📱 Заголовок App (Замена, Низкий)"
+      default: "🔋 Батарея+: 🪫♻️ Заряд &lt; "
       selector:
         text:
           multiple: false
           multiline: false
     title_short_replace_ok:
-      name: "\U0001F4F1 Заголовок App (Замена, OK)"
-      default: "\U0001F50B Батарея+: Замена не требуется"
+      name: "📱 Заголовок App (Замена, OK)"
+      default: "🔋 Батарея+: Замена не требуется"
       selector:
         text:
           multiple: false
           multiline: false
     title_short_charge_low:
-      name: "\U0001F4F1 Заголовок App (Зарядка, Низкий)"
-      default: "\U0001F50B Батарея+: \U0001FAAB\U0001F50C Заряд &lt; "
+      name: "📱 Заголовок App (Зарядка, Низкий)"
+      default: "🔋 Батарея+: 🪫🔌 Заряд &lt; "
       selector:
         text:
           multiple: false
           multiline: false
     title_short_charge_ok:
-      name: "\U0001F4F1 Заголовок App (Зарядка, OK)"
-      default: "\U0001F50B Батарея+: Зарядка не требуется"
+      name: "📱 Заголовок App (Зарядка, OK)"
+      default: "🔋 Батарея+: Зарядка не требуется"
       selector:
         text:
           multiple: false
           multiline: false
     title_full_report:
-      name: "\U0001F4CA Заголовок (Полный отчет)"
-      default: "\U0001F50B <b>Полный отчет Батарея+ (Сортировка по уровню):</b>"
+      name: "📊 Заголовок (Полный отчет)"
+      default: "🔋 <b>Полный отчет Батарея+ (Сортировка по уровню):</b>"
       selector:
         text:
           multiple: false
@@ -293,9 +293,9 @@ sequence:
       %}\n      {% set cleaned_name = name | replace(' Батарея+', '') | trim %} \n
       \     {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in
       cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}\n      {%
-      set status_icon = '\U0001F7E2' %} \n      {% if numerical_level < red_boundary
-      %} {% set status_icon = '\U0001F534' %}\n      {% elif numerical_level < yellow_boundary
-      %} {% set status_icon = '\U0001F7E1' %}\n      {% endif %}\n      {% set status_label
+      set status_icon = '🟢' %} \n      {% if numerical_level < red_boundary
+      %} {% set status_icon = '🔴' %}\n      {% elif numerical_level < yellow_boundary
+      %} {% set status_icon = '🟡' %}\n      {% endif %}\n      {% set status_label
       = '' %}\n      {% if numerical_level < threshold %}\n        {% set status_label
       = text_full_replace_label if not is_rechargeable else text_full_charge_label
       %}\n      {% endif %}\n      {% set details = \"\" %}\n      {% if not is_rechargeable
@@ -387,7 +387,7 @@ sequence:
     sequence:
     - service: telegram_bot.send_message
       data:
-        target: '{{ target_chat_ids }}'
+        chat_id: '{{ target_chat_ids }}'
         message: "{% set report_body = disposable_message %}\n{% if report_body.startswith('⚠️')
           %}\n  {% set header = '<b>' ~ title_short_replace_low ~ critical_threshold
           ~ '%</b>' %}\n{% else %}\n  {% set header = '<b>' ~ title_short_replace_ok
@@ -395,7 +395,7 @@ sequence:
         parse_mode: html
     - service: telegram_bot.send_message
       data:
-        target: '{{ target_chat_ids }}'
+        chat_id: '{{ target_chat_ids }}'
         message: "{% set report_body = rechargeable_message %}\n{% if report_body.startswith('⚠️')
           %}\n  {% set header = '<b>' ~ title_short_charge_low ~ critical_threshold
           ~ '%</b>' %}\n{% else %}\n  {% set header = '<b>' ~ title_short_charge_ok
@@ -408,7 +408,7 @@ sequence:
         sequence:
         - service: telegram_bot.send_message
           data:
-            target: '{{ target_chat_ids }}'
+            chat_id: '{{ target_chat_ids }}'
             message: '{{ full_report_message }}'
             parse_mode: html
 mode: single

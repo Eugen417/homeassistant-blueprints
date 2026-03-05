@@ -1,10 +1,11 @@
-id: automation_battery_status_report_v4_7_5_en
+id: automation_battery_status_report_v4_7_6_en
 blueprint:
-  name: 🪫 Battery Status Report (v4.7.5)
+  name: 🪫 Battery Status Report (v4.7.6)
   description: |
     Creates two short reports (separated into "Replacement" and "Recharge") for devices whose charge is below the critical level. 
     Sends reports to the mobile device and/or Telegram at the specified time and days, indicating the type and quantity of batteries. 
     
+    **FIX v4.7.6:** Replaced deprecated target parameter with chat_id for Telegram.
     **FIX v3.7.4:** Critical fix for MarkdownV2 escaping in Telegram messages, which prevented short reports from being sent.
     
     **Important requirement!** The **HA-Battery Notes** integration must be installed and configured for this automation to work.
@@ -343,7 +344,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ target_chat_ids }}" # Chat IDs with correctly added hyphen
+                      chat_id: "{{ target_chat_ids }}" # Chat IDs with correctly added hyphen
                       message: |
                         {% set report_body = disposable_message %}
                         
@@ -426,7 +427,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = rechargeable_message %}
                         
@@ -491,7 +492,7 @@ action:
             
           - service: telegram_bot.send_message
             data:
-              target: "{{ target_chat_ids }}" 
+              chat_id: "{{ target_chat_ids }}" 
               message: |
                 {% set report_body = full_report_message %}
                 {# Full escaping of MarkdownV2 special characters. Restore asterisks for the header. #}

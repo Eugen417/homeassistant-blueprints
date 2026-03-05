@@ -1,6 +1,6 @@
 blueprint:
-  name: 📊 Периодический Отчет (ВСЕ классы) 
-  description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров.
+  name: 📊 Периодический Отчет (ВСЕ классы) v1.1
+  description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров. Заменен устаревший параметр target на chat_id.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 
@@ -121,10 +121,11 @@ action:
   - service: telegram_bot.send_message
     data:
       
-      # 1. ЛОГИКА TARGET
-      target: >-
+      # 1. ЛОГИКА CHAT_ID
+      chat_id: >-
         {% set target_input = telegram_target_input | default({}) %}
-        {% set selected_entities = target_input.entity_id | default([]) | flatten %}
+        {% set selected_entities_raw = target_input.entity_id | default([]) %}
+        {% set selected_entities = [selected_entities_raw] | flatten %}
         {% set entity_ids_only = selected_entities | map('regex_replace', find='^notify\..+_', replace='') | list %}
         {% set ns = namespace(target_ids=[]) %}
         {% for id_string in entity_ids_only %}

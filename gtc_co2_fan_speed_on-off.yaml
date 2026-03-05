@@ -1,10 +1,12 @@
 blueprint:
-  name: 💨 Управление приточной вентиляцией по CO2 v19 (со встроенным быстрым режимом)
+  name: 💨 Управление приточной вентиляцией по CO2 v20 (со встроенным быстрым режимом)
   description: |
     Автоматизация управляет вентилятором по уровню CO2. Добавлена **встроенная** настройка 
     "Быстрый режим" (Fast Mode), который при включении принудительно запускает
     вентилятор на максимальную скорость до достижения целевого порога CO2, 
     игнорируя плавную регулировку.
+    
+    Заменен устаревший параметр target на chat_id для Telegram.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/gtc_co2_fan_speed_on-off.yaml
 
@@ -315,7 +317,7 @@ action:
             sequence:
               - service: telegram_bot.send_message
                 data:
-                  target: "{{ target_chat_ids }}"
+                  chat_id: "{{ target_chat_ids }}"
                   message: >
                     {%- set
                     message_title = "💨 \*Внимание: Блокировка
@@ -367,7 +369,7 @@ action:
               - alias: Автоматизация уже работает
                 service: telegram_bot.send_message
                 data:
-                  target: "{{ trigger.event.data.chat_id }}"
+                  chat_id: "{{ trigger.event.data.chat_id }}"
                   message: >
                     ℹ️ Вентилятор <b>{{ target_fan_entity.split('.')[-1] }}</b> уже включен! Скорость:
                     <b>{{ state_attr(target_fan_entity, 'percentage') }}%</b>.
@@ -391,7 +393,7 @@ action:
               - alias: Установка в режиме ожидания (CO2 низкий)
                 service: telegram_bot.send_message
                 data:
-                  target: "{{ trigger.event.data.chat_id }}"
+                  chat_id: "{{ trigger.event.data.chat_id }}"
                   message: >
                     ℹ️ Установка находится в режиме ожидания (<b>{{
                     states(mode_select_entity_id)
@@ -427,7 +429,7 @@ action:
                   sequence:
                     - service: telegram_bot.send_message
                       data:
-                        target: "{{ trigger.event.data.chat_id }}"
+                        chat_id: "{{ trigger.event.data.chat_id }}"
                         message: >-
                           Попытка включения 1: не удалось ❌. Пробую
                           повторно...
@@ -457,7 +459,7 @@ action:
                       enabled: false
                     - service: telegram_bot.send_message
                       data:
-                        target: "{{ trigger.event.data.chat_id }}"
+                        chat_id: "{{ trigger.event.data.chat_id }}"
                         message: >-
                           ✅ {{ target_fan_entity.split('.')[-1] }} включен! Автоматизация завершена
                           успешно. (Запущен в **{{ 'быстром' if is_fast_mode else 'автоматическом' }}** режиме).
@@ -468,7 +470,7 @@ action:
                   sequence:
                     - service: telegram_bot.send_message
                       data:
-                        target: "{{ trigger.event.data.chat_id }}"
+                        chat_id: "{{ trigger.event.data.chat_id }}"
                         message: >
                           ❌ <b>{{ target_fan_entity.split('.')[-1] }}</b> не включился после двух
                           попыток! Требуется ручная проверка устройства.
@@ -478,7 +480,7 @@ action:
             - alias: Невозможно включить/Неизвестный статус
               service: telegram_bot.send_message
               data:
-                target: "{{ trigger.event.data.chat_id }}"
+                chat_id: "{{ trigger.event.data.chat_id }}"
                 message: "⚠️ Установка не может быть включена (Текущий режим: <b>{{ states(mode_select_entity_id) }}</b>). Вентилятор: <b>{{ states(target_fan_entity) }}</b>. Текущий CO2: <b>{{ states(previous_co2_helper_entity_id) }} ppm</b>. Порог включения: <b>{{ (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) | round(0) }} ppm</b>.\n (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)"
                 parse_mode: html
 

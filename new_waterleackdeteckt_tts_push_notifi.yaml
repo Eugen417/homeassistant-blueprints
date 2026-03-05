@@ -1,7 +1,7 @@
 blueprint:
-  name: 💧 Уведомление о протечке v15.9 (Final Stable)
+  name: 💧 Уведомление о протечке v16.0 (Fixed Telegram)
   description: >-
-    Устранены проблемы с отправкой в телеграмм
+    Устранены проблемы с отправкой в телеграмм. Заменен устаревший параметр target на chat_id.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/new_waterleackdeteckt_tts_push_notifi.yaml
   
@@ -221,7 +221,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: '{{ target_chat_ids }}'
+                      chat_id: '{{ target_chat_ids }}'
                       message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                       parse_mode: html
 
@@ -254,7 +254,7 @@ action:
                         sequence:
                           - service: telegram_bot.send_message
                             data:
-                              target: '{{ target_chat_ids }}'
+                              chat_id: '{{ target_chat_ids }}'
                               message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
                               parse_mode: html
 
@@ -272,7 +272,7 @@ action:
                         sequence:
                           - service: telegram_bot.send_message
                             data:
-                              target: '{{ target_chat_ids }}'
+                              chat_id: '{{ target_chat_ids }}'
                               message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
                               parse_mode: html
 
@@ -301,7 +301,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: '{{ target_chat_ids }}'
+                      chat_id: '{{ target_chat_ids }}'
                       message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
                       parse_mode: html
           - service: media_player.volume_set
@@ -327,7 +327,7 @@ action:
                         sequence:
                           - service: telegram_bot.send_message
                             data:
-                              target: '{{ target_chat_ids }}'
+                              chat_id: '{{ target_chat_ids }}'
                               message: "<b>✅ УСПЕШНО:</b> Краны в зоне {{ zone }} закрыты."
                               parse_mode: html
               - conditions: "{{ valves | length > 0 }}"
@@ -343,7 +343,7 @@ action:
                         sequence:
                           - service: telegram_bot.send_message
                             data:
-                              target: '{{ target_chat_ids }}'
+                              chat_id: '{{ target_chat_ids }}'
                               message: "<b>🚨 ОШИБКА:</b> Не закрыты: {{ failed }}"
                               parse_mode: html
 
@@ -372,7 +372,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: '{{ target_chat_ids }}'
+                      chat_id: '{{ target_chat_ids }}'
                       message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
                       parse_mode: html
           - service: !input 'tts_service'
@@ -420,7 +420,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: '{{ target_chat_ids }}'
+                      chat_id: '{{ target_chat_ids }}'
                       message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
                       parse_mode: html
           - service: !input 'tts_service'

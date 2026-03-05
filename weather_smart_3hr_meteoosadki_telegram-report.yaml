@@ -1,8 +1,8 @@
 blueprint:
-  name: "Оповещение: Осадки (Активная проверка) v1.3"
+  name: "Оповещение: Осадки (Активная проверка) v1.4"
   description: >
     Проверяет погоду по расписанию. Если в ближайшие 3 ЧАСА (включая текущий) ожидаются осадки — шлет уведомление.
-    Фильтрует прошедшее время. Исправлена ошибка областей видимости Jinja2.
+    Фильтрует прошедшее время. Исправлена ошибка областей видимости Jinja2. Заменен устаревший target на chat_id.
   domain: automation
 
   input:
@@ -110,7 +110,7 @@ action:
       - action: telegram_bot.send_message
         metadata: {}
         data:
-          target: "{{ target_chat_ids }}"
+          chat_id: "{{ target_chat_ids }}"
           parse_mode: html
           title: "☔️ Осадки в ближайшее время!"
           message: >

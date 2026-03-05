@@ -1,10 +1,10 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_8_1_ru
+id: automation_otchet_po_sostoianiiu_batarei_v3_8_2_ru
 
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.8.1)
+  name: 🪫 Отчет по состоянию батарей (v3.8.2)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
-    Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время.
+    Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время. Заменен устаревший target на chat_id.
     
     **v3.10:** Увеличен отступ перед списком "Устройства без связи".
     **HTML:** Использует HTML-разметку для Telegram.
@@ -520,7 +520,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = disposable_message %}
                         {% if report_body.startswith('⚠️') %}
@@ -590,7 +590,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}" 
                       message: |
                         {% set report_body = rechargeable_message %}
                         {% if report_body.startswith('⚠️') %}
@@ -638,7 +638,7 @@ action:
         sequence:
           - service: telegram_bot.send_message
             data:
-              target: "{{ target_chat_ids }}" 
+              chat_id: "{{ target_chat_ids }}" 
               message: "{{ full_report_message }}"
               parse_mode: html
     

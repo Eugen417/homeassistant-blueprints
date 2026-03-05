@@ -1,10 +1,11 @@
-id: homeassistant_person_tracker_telegram_v1.5
+id: homeassistant_person_tracker_telegram_v1.6
 blueprint:
-  name: 🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍
+  name: 🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.6
   description: |
     Отслеживание прихода/ухода выбранных пользователей (person.XXX) с генерацией
     интерактивной кнопки для запроса местоположения. **Все уведомления теперь
     полностью редактируются через настройки автоматизации.**
+    Заменен устаревший параметр target на chat_id для Telegram.
     
     ✅ Поддержка одновременного срабатывания (`mode: parallel`) и запроса местоположения
     **всех** отслеживаемых пользователей (`/gde_vse`).
@@ -198,7 +199,7 @@ action:
             data:
               # Используем новую переменную, заменяя {name}
               message: "{{ phrase_left_home | replace('{name}', triggered_person_name) }}"
-              target: "{{ notify_target_id }}"
+              chat_id: "{{ notify_target_id }}"
               parse_mode: plain_text
               inline_keyboard:
                 # Используем новую переменную
@@ -217,7 +218,7 @@ action:
             data:
               # Используем новую переменную, заменяя {name}
               message: "{{ phrase_returned_home | replace('{name}', triggered_person_name) }}"
-              target: "{{ notify_target_id }}"
+              chat_id: "{{ notify_target_id }}"
               parse_mode: plain_text
           
       # ----------------------------------------------------------------------
@@ -267,13 +268,13 @@ action:
                     
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ chat_id_response }}"
+                      chat_id: "{{ chat_id_response }}"
                       message: "{{ status_message }}"
                       parse_mode: markdown
                       
                   - service: telegram_bot.send_location
                     data:
-                      target: "{{ chat_id_response }}"
+                      chat_id: "{{ chat_id_response }}"
                       latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                       longitude: "{{ state_attr(target_person_id, 'longitude') }}"
                   
@@ -284,7 +285,7 @@ action:
                 sequence:
                   - service: telegram_bot.send_message
                     data:
-                      target: "{{ chat_id_response }}"
+                      chat_id: "{{ chat_id_response }}"
                       # Используем новую переменную, заменяя {name}
                       message: "{{ phrase_unknown | replace('{name}', target_person_name) }}"
                       parse_mode: plain_text
@@ -309,7 +310,7 @@ action:
               
           - service: telegram_bot.send_message
             data:
-              target: "{{ chat_id_response }}"
+              chat_id: "{{ chat_id_response }}"
               # Используем новую переменную, заменяя {count} и {sender}
               message: "{{ phrase_request_all | replace('{count}', (tracked_persons_ids | count)) | replace('{sender}', sender_name) }}"
               parse_mode: plain_text
@@ -343,13 +344,13 @@ action:
                               
                         - service: telegram_bot.send_message
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             message: "{{ status_message }}"
                             parse_mode: markdown 
                             
                         - service: telegram_bot.send_location
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                             longitude: "{{ state_attr(target_person_id, 'longitude') }}"
                         
@@ -360,7 +361,7 @@ action:
                       sequence:
                         - service: telegram_bot.send_message
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             # Используем новую переменную, заменяя {name}
                             message: "{{ phrase_unknown | replace('{name}', target_person_name) }}"
                             parse_mode: plain_text
@@ -379,7 +380,7 @@ action:
           
           - service: telegram_bot.send_message
             data:
-              target: "{{ chat_id_response }}"
+              chat_id: "{{ chat_id_response }}"
               # Используем новую переменную, заменяя {count} и {sender}
               message: "{{ phrase_request_all | replace('{count}', (tracked_persons_ids | count)) | replace('{sender}', sender_name) }}"
               parse_mode: plain_text
@@ -413,13 +414,13 @@ action:
                               
                         - service: telegram_bot.send_message
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             message: "{{ status_message }}"
                             parse_mode: markdown 
                             
                         - service: telegram_bot.send_location
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                             longitude: "{{ state_attr(target_person_id, 'longitude') }}"
                         
@@ -430,7 +431,7 @@ action:
                       sequence:
                         - service: telegram_bot.send_message
                           data:
-                            target: "{{ chat_id_response }}"
+                            chat_id: "{{ chat_id_response }}"
                             # Используем новую переменную, заменяя {name}
                             message: "{{ phrase_unknown | replace('{name}', target_person_name) }}"
                             parse_mode: plain_text

@@ -1,7 +1,8 @@
 blueprint:
-  name: 💧 Уведомление о протечке v16.0 (Fixed Telegram)
+  name: 💧 Уведомление о протечке v16.1 (Custom Actions)
   description: >-
     Устранены проблемы с отправкой в телеграмм. Заменен устаревший параметр target на chat_id.
+    Добавлена возможность запускать любые дополнительные действия (например, сирену).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/new_waterleackdeteckt_tts_push_notifi.yaml
   
@@ -145,11 +146,17 @@ blueprint:
           step: 1
           mode: slider
       default: 5
+    # === НОВЫЙ БЛОК ДЛЯ СИРЕНЫ И ДРУГИХ ДЕЙСТВИЙ ===
+    custom_action:
+      name: Дополнительные действия (Сирена, свет и т.д.)
+      description: "(Необязательно) Любые действия, которые нужно выполнить немедленно при обнаружении протечки. Оставьте пустым, если ничего дополнительно запускать не нужно."
+      default: []
+      selector:
+        action: {}
 
 variables:
   telegram_input: !input telegram_notify_target
   notif_title: !input notification_title
-  # === ЛОГИКА ИЗ СКРИПТА BATTERY REPORT (Работает надежно) ===
   target_chat_ids: >
     {% set selected_entities_raw = telegram_input.entity_id | default([]) %} 
     {% set selected_entities = [selected_entities_raw] | flatten %} 
@@ -191,251 +198,249 @@ condition:
     value_template: "{{ trigger.from_state.state != 'unknown' }}"
 
 action:
-  - choose:
-      # ================= ЗОНА 1 =================
-      - conditions: "{{ trigger.alias == 'Протечка в первой зоне' }}"
-        sequence:
-          - variables:
-              zone: !input 'zone_1_name'
-              valves: !input 'water_shutoff_devices_zone_1'
-              # Очищаем имя датчика от английского текста
-              sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
-          
-          # 1. Закрываем краны
-          - service: homeassistant.turn_off
-            target:
-              entity_id: "{{ valves }}"
-          
-          # 2. Уведомление PUSH (Сразу) - ИСПРАВЛЕНО (Используем прямой вызов device)
-          - if: "{{ notify_device is not none }}"
-            then:
-              - domain: mobile_app
-                type: notify
-                device_id: !input notify_device
-                title: "{{ notif_title }}"
-                message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}. Закрываю краны."
+  # Используем parallel, чтобы дополнительные действия (сирена) выполнялись мгновенно 
+  # и не ждали, пока Алиса скажет текст или пройдет задержка проверки кранов
+  - parallel:
+      # Ветка 1: Выполнение пользовательских действий (если они заданы)
+      - sequence:
+          - choose: []
+            default: !input custom_action
 
-          # 3. Уведомление Telegram (Сразу)
+      # Ветка 2: Основная логика по зонам (краны, пуши, тг, голос)
+      - sequence:
           - choose:
-              - conditions: "{{ target_chat_ids | length > 0 }}"
-                sequence:
-                  - service: telegram_bot.send_message
-                    data:
-                      chat_id: '{{ target_chat_ids }}'
-                      message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
-                      parse_mode: html
-
-          # 4. TTS (Первое сообщение)
-          - service: media_player.volume_set
-            target:
-              entity_id: !input 'tts_media_players'
-            data:
-              volume_level: !input 'tts_volume'
-          - service: !input 'tts_service'
-            data:
-              entity_id: !input 'tts_media_players'
-              message: "Внимание! Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. Закрываю краны."
-
-          # 5. Задержка для закрытия кранов
-          - delay:
-              seconds: !input 'tts_delay_after_leak_message'
-
-          # 6. Проверка результата и второе уведомление
-          - choose:
-              # СЦЕНАРИЙ А: Все краны закрыты (УСПЕХ)
-              - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
-                sequence:
-                  - service: !input 'tts_service'
-                    data:
-                      entity_id: !input 'tts_media_players'
-                      message: "Я перекрыла все краны в зоне {{ zone }}."
-                  - choose:
-                      - conditions: "{{ target_chat_ids | length > 0 }}"
-                        sequence:
-                          - service: telegram_bot.send_message
-                            data:
-                              chat_id: '{{ target_chat_ids }}'
-                              message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
-                              parse_mode: html
-
-              # СЦЕНАРИЙ Б: Частичный успех или провал (если краны есть)
-              - conditions: "{{ valves | length > 0 }}"
+              # ================= ЗОНА 1 =================
+              - conditions: "{{ trigger.alias == 'Протечка в первой зоне' }}"
                 sequence:
                   - variables:
-                      failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
-                  - service: !input 'tts_service'
-                    data:
-                      entity_id: !input 'tts_media_players'
-                      message: "Внимание! Не удалось закрыть некоторые краны в зоне {{ zone }}."
+                      zone: !input 'zone_1_name'
+                      valves: !input 'water_shutoff_devices_zone_1'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                  
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}. Закрываю краны."
+
                   - choose:
                       - conditions: "{{ target_chat_ids | length > 0 }}"
                         sequence:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                               parse_mode: html
 
-      # ================= ЗОНА 2 =================
-      - conditions: "{{ trigger.alias == 'Протечка во второй зоне' }}"
-        sequence:
-          - variables:
-              zone: !input 'zone_2_name'
-              valves: !input 'water_shutoff_devices_zone_2'
-              sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
-          - service: homeassistant.turn_off
-            target:
-              entity_id: "{{ valves }}"
-          
-          # PUSH FIX
-          - if: "{{ notify_device is not none }}"
-            then:
-              - domain: mobile_app
-                type: notify
-                device_id: !input notify_device
-                title: "{{ notif_title }}"
-                message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
-
-          - choose:
-              - conditions: "{{ target_chat_ids | length > 0 }}"
-                sequence:
-                  - service: telegram_bot.send_message
+                  - service: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
                     data:
-                      chat_id: '{{ target_chat_ids }}'
-                      message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
-                      parse_mode: html
-          - service: media_player.volume_set
-            target:
-              entity_id: !input 'tts_media_players'
-            data:
-              volume_level: !input 'tts_volume'
-          - service: !input 'tts_service'
-            data:
-              entity_id: !input 'tts_media_players'
-              message: "Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. Закрываю краны."
-          - delay:
-              seconds: !input 'tts_delay_after_leak_message'
-          - choose:
-              - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
-                sequence:
+                      volume_level: !input 'tts_volume'
                   - service: !input 'tts_service'
                     data:
                       entity_id: !input 'tts_media_players'
-                      message: "Я перекрыла все краны в зоне {{ zone }}."
+                      message: "Внимание! Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. Закрываю краны."
+
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+
                   - choose:
-                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
                         sequence:
-                          - service: telegram_bot.send_message
+                          - service: !input 'tts_service'
                             data:
-                              chat_id: '{{ target_chat_ids }}'
-                              message: "<b>✅ УСПЕШНО:</b> Краны в зоне {{ zone }} закрыты."
-                              parse_mode: html
-              - conditions: "{{ valves | length > 0 }}"
+                              entity_id: !input 'tts_media_players'
+                              message: "Я перекрыла все краны в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - service: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
+                                      parse_mode: html
+
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Внимание! Не удалось закрыть некоторые краны в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - service: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                                      parse_mode: html
+
+              # ================= ЗОНА 2 =================
+              - conditions: "{{ trigger.alias == 'Протечка во второй зоне' }}"
                 sequence:
                   - variables:
-                      failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
-                  - service: !input 'tts_service'
-                    data:
-                      entity_id: !input 'tts_media_players'
-                      message: "Внимание! Ошибка закрытия кранов в зоне {{ zone }}."
+                      zone: !input 'zone_2_name'
+                      valves: !input 'water_shutoff_devices_zone_2'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
+
                   - choose:
                       - conditions: "{{ target_chat_ids | length > 0 }}"
                         sequence:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>🚨 ОШИБКА:</b> Не закрыты: {{ failed }}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
                               parse_mode: html
-
-      # ================= ЗОНА 3 =================
-      - conditions: "{{ trigger.alias == 'Протечка в третьей зоне' }}"
-        sequence:
-          - variables:
-              zone: !input 'zone_3_name'
-              valves: !input 'water_shutoff_devices_zone_3'
-              sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
-          - service: homeassistant.turn_off
-            target:
-              entity_id: "{{ valves }}"
-          
-          # PUSH FIX
-          - if: "{{ notify_device is not none }}"
-            then:
-              - domain: mobile_app
-                type: notify
-                device_id: !input notify_device
-                title: "{{ notif_title }}"
-                message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
-
-          - choose:
-              - conditions: "{{ target_chat_ids | length > 0 }}"
-                sequence:
-                  - service: telegram_bot.send_message
+                  - service: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
                     data:
-                      chat_id: '{{ target_chat_ids }}'
-                      message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
-                      parse_mode: html
-          - service: !input 'tts_service'
-            data:
-              entity_id: !input 'tts_media_players'
-              message: "Обнаружена протечка в зоне {{ zone }}."
-          - delay:
-              seconds: !input 'tts_delay_after_leak_message'
-          - choose:
-              - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
-                sequence:
+                      volume_level: !input 'tts_volume'
                   - service: !input 'tts_service'
                     data:
                       entity_id: !input 'tts_media_players'
-                      message: "Краны в зоне {{ zone }} закрыты."
-              - conditions: "{{ valves | length > 0 }}"
+                      message: "Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. Закрываю краны."
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Я перекрыла все краны в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - service: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Краны в зоне {{ zone }} закрыты."
+                                      parse_mode: html
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Внимание! Ошибка закрытия кранов в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - service: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты: {{ failed }}"
+                                      parse_mode: html
+
+              # ================= ЗОНА 3 =================
+              - conditions: "{{ trigger.alias == 'Протечка в третьей зоне' }}"
                 sequence:
+                  - variables:
+                      zone: !input 'zone_3_name'
+                      valves: !input 'water_shutoff_devices_zone_3'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
+
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - service: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
+                              parse_mode: html
                   - service: !input 'tts_service'
                     data:
                       entity_id: !input 'tts_media_players'
-                      message: "Ошибка закрытия кранов в зоне {{ zone }}."
+                      message: "Обнаружена протечка в зоне {{ zone }}."
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Краны в зоне {{ zone }} закрыты."
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Ошибка закрытия кранов в зоне {{ zone }}."
 
-      # ================= ЗОНА 4 =================
-      - conditions: "{{ trigger.alias == 'Протечка в четвертой зоне' }}"
-        sequence:
-          - variables:
-              zone: !input 'zone_4_name'
-              valves: !input 'water_shutoff_devices_zone_4'
-              sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
-          - service: homeassistant.turn_off
-            target:
-              entity_id: "{{ valves }}"
-          
-          # PUSH FIX
-          - if: "{{ notify_device is not none }}"
-            then:
-              - domain: mobile_app
-                type: notify
-                device_id: !input notify_device
-                title: "{{ notif_title }}"
-                message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
+              # ================= ЗОНА 4 =================
+              - conditions: "{{ trigger.alias == 'Протечка в четвертой зоне' }}"
+                sequence:
+                  - variables:
+                      zone: !input 'zone_4_name'
+                      valves: !input 'water_shutoff_devices_zone_4'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
 
-          - choose:
-              - conditions: "{{ target_chat_ids | length > 0 }}"
-                sequence:
-                  - service: telegram_bot.send_message
-                    data:
-                      chat_id: '{{ target_chat_ids }}'
-                      message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
-                      parse_mode: html
-          - service: !input 'tts_service'
-            data:
-              entity_id: !input 'tts_media_players'
-              message: "Внимание! Протечка в зоне {{ zone }}."
-          - delay:
-              seconds: !input 'tts_delay_after_leak_message'
-          - choose:
-              - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
-                sequence:
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - service: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}."
+                              parse_mode: html
                   - service: !input 'tts_service'
                     data:
                       entity_id: !input 'tts_media_players'
-                      message: "Краны в зоне {{ zone }} перекрыты."
+                      message: "Внимание! Протечка в зоне {{ zone }}."
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - service: !input 'tts_service'
+                            data:
+                              entity_id: !input 'tts_media_players'
+                              message: "Краны в зоне {{ zone }} перекрыты."
 
   - delay:
       seconds: !input 'tts_delay_between_runs'

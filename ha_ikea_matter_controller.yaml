@@ -1,0 +1,136 @@
+blueprint:
+  name: IKEA Matter Controller to Light
+  description: >
+    Универсальный блюпринт для управления светом через выключатели и "крутилки" IKEA Matter.
+    Автоматически рассчитывает шаг изменения яркости при прокрутке и позволяет назначать любые действия на обычные нажатия.
+    Включает защиту от ложных срабатываний при перезагрузках HA и Matter-сервера.
+  domain: automation
+  
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/ha_ikea_matter_controller.yaml
+  input:
+    target_light:
+      name: Светильник (Light)
+      description: Светильник, которым будет управлять эта крутилка.
+      selector:
+        entity:
+          domain: light
+    step_size:
+      name: Множитель шага яркости
+      description: На сколько умножать индекс события (1-8) при прокрутке.
+      default: 13
+      selector:
+        number:
+          min: 1
+          max: 50
+    button_main:
+      name: События основной кнопки
+      description: Укажите entity (event.*) для нажатий (например, event.button12s3).
+      selector:
+        entity:
+          domain: event
+    rotary_left:
+      name: События крутилки ВЛЕВО (Минус)
+      description: Укажите entity (event.*) для прокрутки влево (например, event.button12s2).
+      selector:
+        entity:
+          domain: event
+    rotary_right:
+      name: События крутилки ВПРАВО (Плюс)
+      description: Укажите entity (event.*) для прокрутки вправо (например, event.button12s1).
+      selector:
+        entity:
+          domain: event
+    on_single_press:
+      name: "Действие: 1 нажатие (multi_press_1)"
+      description: "Назначьте действие (например, Action -> Light: Toggle)"
+      default: []
+      selector:
+        action: {}
+    on_double_press:
+      name: "Действие: 2 нажатия (multi_press_2)"
+      description: "Назначьте действие (например, Action -> Light: Turn on -> Brightness 20%)"
+      default: []
+      selector:
+        action: {}
+    on_long_press:
+      name: "Действие: Удержание (long_press)"
+      description: "Назначьте действие (например, Action -> Light: Turn on -> Brightness 100%)"
+      default: []
+      selector:
+        action: {}
+
+mode: queued
+max: 10
+
+trigger:
+  - platform: state
+    entity_id:
+      - !input button_main
+      - !input rotary_left
+      - !input rotary_right
+    not_from:
+      - 'unavailable'
+      - 'unknown'
+    not_to:
+      - 'unavailable'
+      - 'unknown'
+
+variables:
+  light_entity: !input target_light
+  btn_main_ent: !input button_main
+  btn_left_ent: !input rotary_left
+  btn_right_ent: !input rotary_right
+  step_size_var: !input step_size
+
+  # Получаем тип события и entity безопасно
+  event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+  trigger_entity: "{{ trigger.entity_id }}"
+
+  # Математика яркости
+  current_brightness: "{{ state_attr(light_entity, 'brightness') | int(0) }}"
+  press_count: "{{ event_type.split('_')[-1] | int(0) if 'multi_press_' in event_type else 0 }}"
+  step: "{{ press_count * step_size_var }}"
+  new_brightness_plus: "{{ [current_brightness + step, 255] | min }}"
+  new_brightness_minus: "{{ [current_brightness - step, 3] | max }}"
+
+action:
+  - choose:
+      # Логика для крутилки ВПРАВО (Плюс)
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger_entity == btn_right_ent and 'multi_press_' in event_type }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ light_entity }}"
+            data:
+              brightness: "{{ new_brightness_plus }}"
+
+      # Логика для крутилки ВЛЕВО (Минус)
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger_entity == btn_left_ent and 'multi_press_' in event_type }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ light_entity }}"
+            data:
+              brightness: "{{ new_brightness_minus }}"
+
+      # Логика для КНОПКИ: 1 нажатие
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger_entity == btn_main_ent and event_type == 'multi_press_1' }}"
+        sequence: !input on_single_press
+
+      # Логика для КНОПКИ: 2 нажатия
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger_entity == btn_main_ent and event_type == 'multi_press_2' }}"
+        sequence: !input on_double_press
+
+      # Логика для КНОПКИ: Долгое нажатие
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger_entity == btn_main_ent and event_type == 'long_press' }}"
+        sequence: !input on_long_press

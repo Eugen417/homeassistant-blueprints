@@ -1,7 +1,7 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_8_2_ru
+id: automation_otchet_po_sostoianiiu_batarei_v3_8_3_ru
 
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.8.2)
+  name: 🪫 Отчет по состоянию батарей (v3.8.3)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время. Заменен устаревший target на chat_id.
@@ -524,7 +524,7 @@ action:
                       message: |
                         {% set report_body = disposable_message %}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '<b>' ~ title_short_replace_low ~ critical_threshold ~ '%</b>' %}
+                          {% set header = '<b>' ~ title_short_replace_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
                         {% else %}
                           {% set header = '<b>' ~ title_short_replace_ok ~ '</b>' %}
                         {% endif %}
@@ -594,7 +594,7 @@ action:
                       message: |
                         {% set report_body = rechargeable_message %}
                         {% if report_body.startswith('⚠️') %}
-                          {% set header = '<b>' ~ title_short_charge_low ~ critical_threshold ~ '%</b>' %}
+                          {% set header = '<b>' ~ title_short_charge_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
                         {% else %}
                           {% set header = '<b>' ~ title_short_charge_ok ~ '</b>' %}
                         {% endif %}

@@ -1,9 +1,9 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.4.2"
+  name: "Уведомление Прогноз о метео + Карта v1.4.3"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
     Поддерживает Telegram (HTML) и универсальную отправку для VK/Max.
-    В версии 1.92 добавлено скрытие ссылок для VK через вики-разметку.
+    💡 Для VK/Max используйте короткие ссылки (vk.cc).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
   
@@ -224,7 +224,7 @@ action:
         <a href="{{ map_link }}">🗺 Открыть карту осадков</a>
         {%- endif %}
 
-      # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT / WIKI) ---
+      # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT) ---
       msg_text_plain: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
@@ -274,7 +274,7 @@ action:
         {%- endif %}
         {%- if map_link != '' %}
 
-        [{{ map_link }}|🗺 Открыть карту осадков]
+        🗺 Карта осадков: {{ map_link }}
         {%- endif %}
 
   # --- БЛОКИ ОТПРАВКИ ---

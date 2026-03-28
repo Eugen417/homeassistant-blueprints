@@ -1,9 +1,9 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.4.1"
+  name: "Уведомление Прогноз о метео + Карта v1.4.2"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
-    Поддерживает Telegram (HTML) и универсальную отправку для VK/Max (Plain Text).
-    💡 Для VK/Max рекомендуется использовать короткие ссылки (vk.cc).
+    Поддерживает Telegram (HTML) и универсальную отправку для VK/Max.
+    В версии 1.92 добавлено скрытие ссылок для VK через вики-разметку.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
   
@@ -34,7 +34,7 @@ blueprint:
 
     plain_notify_target:
       name: "💬 Уведомления VK / Max Notify"
-      description: "Выберите сущности VK Notify и/или Max Notify. Можно выбрать сразу несколько из разных сервисов. Текст будет отправлен без HTML-тегов."
+      description: "Выберите сущности VK Notify и/или Max Notify. Можно выбрать сразу несколько из разных сервисов."
       default:
         entity_id: []
       selector:
@@ -46,7 +46,7 @@ blueprint:
     map_url:
       name: "Ссылка на карту осадков"
       description: >
-        Вставьте сюда ссылку. Для VK лучше использовать короткие ссылки (через vk.cc или clck.ru).
+        Вставьте сюда ЧИСТУЮ ссылку (https://...). Без <iframe...>.
       default: ""
       selector:
         text: {}
@@ -224,7 +224,7 @@ action:
         <a href="{{ map_link }}">🗺 Открыть карту осадков</a>
         {%- endif %}
 
-      # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT) ---
+      # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT / WIKI) ---
       msg_text_plain: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
@@ -274,7 +274,7 @@ action:
         {%- endif %}
         {%- if map_link != '' %}
 
-        🗺 {{ map_link }}
+        [{{ map_link }}|🗺 Открыть карту осадков]
         {%- endif %}
 
   # --- БЛОКИ ОТПРАВКИ ---

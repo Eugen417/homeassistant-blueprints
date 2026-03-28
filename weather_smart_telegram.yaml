@@ -1,11 +1,10 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.4"
+  name: "Уведомление Прогноз о метео + Карта v1.4.1"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
     Поддерживает Telegram (HTML) и универсальную отправку для VK/Max (Plain Text).
     💡 Для VK/Max рекомендуется использовать короткие ссылки (vk.cc).
   domain: automation
-
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
   
   input:
@@ -161,19 +160,10 @@ action:
 
   # --- ГЕНЕРАЦИЯ СООБЩЕНИЯ ---
   - variables:
-      forecast: "{{ daily_weather_data[weather_entity].forecast }}"
-      bad_weather: ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail']
-      wet_weather: ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy']
-      is_bad: "{{ forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}"
-      mapper:
-        'rainy': "{{ t_rain }}"
-        'pouring': "{{ t_pouring }}"
-        'lightning-rainy': "{{ t_lightning }}"
-        'snowy-rainy': "{{ t_snow_rain }}"
-        'snowy': "{{ t_snow }}"
-        'hail': "{{ t_hail }}"
-      
       msg_title: >-
+        {%- set forecast = daily_weather_data[weather_entity].forecast -%}
+        {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
         {%- if is_bad -%}
         🌨 Прогноз погоды
         {%- else -%}
@@ -183,6 +173,11 @@ action:
 
       # --- ВЕРСИЯ ДЛЯ TELEGRAM (HTML) ---
       msg_text_html: >-
+        {%- set forecast = daily_weather_data[weather_entity].forecast -%}
+        {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+        {%- set wet_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] -%}
+        {%- set mapper = {'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning, 'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail} -%}
+        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
         {%- if is_bad -%}
         <b>Внимание, ожидаются осадки (24ч):</b>
         {%- set ns = namespace(blocks=[], current_block=[]) -%}
@@ -231,6 +226,11 @@ action:
 
       # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT) ---
       msg_text_plain: >-
+        {%- set forecast = daily_weather_data[weather_entity].forecast -%}
+        {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+        {%- set wet_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] -%}
+        {%- set mapper = {'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning, 'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail} -%}
+        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
         {%- if is_bad -%}
         Внимание, ожидаются осадки (24ч):
         {%- set ns = namespace(blocks=[], current_block=[]) -%}

@@ -1,56 +1,56 @@
 blueprint:
   name: Скриншот по движению + Telegram (Выбор сущности)
   description: >
-    При обнаружении движения делает скриншот и 
-    отправляет его в выбранные чаты Telegram (парсинг из notify).
+    При обнаружении движения делает скриншот и отправляет его в выбранные чаты Telegram (парсинг из notify).
   domain: automation
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/photo_push_notifi_ru.yaml
   
   input:
     motion_sensor:
       name: Датчик движения
       selector:
         entity:
-          domain: binary_sensor
+          domain:
+            - binary_sensor
           device_class:
             - motion
             - presence
             - occupancymotion
+          multiple: false
+          reorder: false
     target_camera:
       name: Камера
       selector:
         entity:
-          domain: camera
+          domain:
+            - camera
+          multiple: false
+          reorder: false
     telegram_notify_target:
-      name: 💬 Уведомления Telegram
+      name: "💬 Уведомления Telegram"
       description: Выберите сущности вашего сервиса Telegram (обычно называются notify.telegram_bot_...).
       default:
         entity_id: []
       selector:
         target:
           entity:
-            - domain: notify
+            - domain:
+                - notify
 
 mode: single
 
 trigger:
   - platform: state
     entity_id: !input motion_sensor
-    to: "on"
+    to: 'on'
 
 action:
-  # ----------------------------------------------------------------
-  # 1. ОБЪЯВЛЕНИЕ И ПАРСИНГ ПЕРЕМЕННЫХ
-  # ----------------------------------------------------------------
   - variables:
       camera_entity: !input target_camera
       telegram_notify_entities: !input telegram_notify_target
-      
-      # Генерируем уникальное имя файла
       filename: "motion_{{ now().strftime('%Y%m%d_%H%M%S') }}"
       path_snap: "/config/www/snapshots/{{ filename }}.jpg"
       camera_name: "{{ state_attr(camera_entity, 'friendly_name') or 'Камера' }}"
-      
-      # Парсинг ID чатов из названий выбранных notify-сущностей
       target_chat_ids: >-
         {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
         {% set selected_entities = [selected_entities_raw] | flatten %}
@@ -67,18 +67,12 @@ action:
         {% endfor %}
         {{ ns.target_ids }}
 
-  # ----------------------------------------------------------------
-  # 2. ДЕЙСТВИЯ
-  # ----------------------------------------------------------------
-  
-  # Шаг 1: Делаем скриншот
   - action: camera.snapshot
     target:
       entity_id: !input target_camera
     data:
       filename: "{{ path_snap }}"
 
-  # Шаг 2: Отправляем фото (только если выбраны получатели)
   - choose:
       - conditions:
           - condition: template
@@ -88,4 +82,5 @@ action:
             data:
               chat_id: "{{ target_chat_ids }}"
               file: "{{ path_snap }}"
-              caption: "Тревога: {{ camera_name }}\nДвижение зафиксировано!"
+              caption: "Тревога: <b>{{ camera_name }}</b>\nДвижение зафиксировано!"
+              parse_mode: html

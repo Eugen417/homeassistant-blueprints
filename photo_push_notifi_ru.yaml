@@ -1,11 +1,9 @@
 blueprint:
-  name: Скриншот по движению + Уведомление
+  name: Скриншот по движению + Telegram
   description: >
     При обнаружении движения делает скриншот и 
-    отправляет уведомление с фото на выбранное мобильное устройство.
+    отправляет его в указанный чат Telegram.
   domain: automation
-  
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/photo_push_notifi_ru.yaml
   
   input:
     motion_sensor:
@@ -22,12 +20,11 @@ blueprint:
       selector:
         entity:
           domain: camera
-    notify_device:
-      name: Телефон для уведомлений
-      description: Выберите устройство, на которое установлено приложение Home Assistant.
+    target_chat_id:
+      name: ID чата Telegram (chat_id)
+      description: "Укажите ваш ID в Telegram или ID группы (например: 123456789 или -123456789). Интеграция telegram_bot должна быть предварительно настроена."
       selector:
-        device:
-          integration: mobile_app
+        text:
 
 mode: single
 
@@ -41,43 +38,31 @@ action:
   # 1. ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
   # ----------------------------------------------------------------
   - variables:
-      # ВАЖНО: Переносим input камеры в переменную для использования в шаблонах
       camera_entity: !input target_camera
       
-      # Генерируем уникальное имя файла на основе времени
+      # Генерируем уникальное имя файла
       filename: "motion_{{ now().strftime('%Y%m%d_%H%M%S') }}"
       
-      # Пути для сохранения (внутренние, для Home Assistant)
+      # Полный системный путь для сохранения картинки и отправки её в Telegram
       path_snap: "/config/www/snapshots/{{ filename }}.jpg"
       
-      # Ссылки для уведомления (внешние, для телефона)
-      url_snap: "/local/snapshots/{{ filename }}.jpg"
-      
-      # Получаем красивое имя камеры
+      # Получаем красивое имя камеры для подписи
       camera_name: "{{ state_attr(camera_entity, 'friendly_name') or 'Камера' }}"
 
   # ----------------------------------------------------------------
   # 2. ДЕЙСТВИЯ
   # ----------------------------------------------------------------
   
-  # Скриншот
+  # Шаг 1: Делаем скриншот
   - action: camera.snapshot
     target:
       entity_id: !input target_camera
     data:
       filename: "{{ path_snap }}"
 
-  # Уведомление на телефон
-  # Используем domain: mobile_app для прямой отправки на Device ID
-  - domain: mobile_app
-    type: notify
-    device_id: !input notify_device
-    message: "Движение зафиксировано!"
-    title: "Тревога: {{ camera_name }}"
+  # Шаг 2: Отправляем в Telegram
+  - action: telegram_bot.send_photo
     data:
-      image: "{{ url_snap }}"
-      # По клику на уведомление будет открываться картинка
-      clickAction: "{{ url_snap }}"
-      url: "{{ url_snap }}" 
-      ttl: 0
-      priority: high
+      chat_id: !input target_chat_id
+      file: "{{ path_snap }}"
+      caption: "Тревога: {{ camera_name }}\nДвижение зафиксировано!"

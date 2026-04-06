@@ -6,6 +6,8 @@ blueprint:
     Фильтрует прошедшее время.
   domain: automation
 
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_3hr_meteoosadki_telegram-report.yaml
+
   input:
     weather_entity:
       name: "Погодная сущность"

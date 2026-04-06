@@ -1,55 +1,10 @@
-blueprint:
-  name: Скриншот по движению + Telegram (Выбор сущности)
-  description: >
-    При обнаружении движения делает скриншот и отправляет его в выбранные чаты Telegram (парсинг из notify).
-  domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/photo_push_notifi_ru.yaml
-  
-  input:
-    motion_sensor:
-      name: Датчик движения
-      selector:
-        entity:
-          domain:
-            - binary_sensor
-          device_class:
-            - motion
-            - presence
-            - occupancymotion
-          multiple: false
-          reorder: false
-    target_camera:
-      name: Камера
-      selector:
-        entity:
-          domain:
-            - camera
-          multiple: false
-          reorder: false
-    telegram_notify_target:
-      name: "💬 Уведомления Telegram"
-      description: Выберите сущности вашего сервиса Telegram (обычно называются notify.telegram_bot_...).
-      default:
-        entity_id: []
-      selector:
-        target:
-          entity:
-            - domain:
-                - notify
-
-mode: single
-
-trigger:
-  - platform: state
-    entity_id: !input motion_sensor
-    to: 'on'
-
 action:
   - variables:
       camera_entity: !input target_camera
       telegram_notify_entities: !input telegram_notify_target
       filename: "motion_{{ now().strftime('%Y%m%d_%H%M%S') }}"
-      path_snap: "/config/www/snapshots/{{ filename }}.jpg"
+      # Сохраняем напрямую в системную папку media
+      path_snap: "/media/{{ filename }}.jpg"
       camera_name: "{{ state_attr(camera_entity, 'friendly_name') or 'Камера' }}"
       target_chat_ids: >-
         {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}

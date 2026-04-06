@@ -1,18 +1,14 @@
-id: automation_otchet_po_sostoianiiu_batarei_v3_8_3_ru
-
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.8.3)
+  name: 🪫 Отчет по состоянию батарей (v3.10.0)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
-    Отправляет отчеты на мобильное устройство и/или в Telegram в заданное время. Заменен устаревший target на chat_id.
+    Отправляет отчеты на мобильное устройство, в Telegram, VK и/или Max в заданное время.
     
-    **v3.10:** Увеличен отступ перед списком "Устройства без связи".
-    **HTML:** Использует HTML-разметку для Telegram.
+    **v3.10.0:** Max Notify переведен на выбор сущностей и HTML-форматирование (аналогично Telegram). VK Notify отправляет Plain Text с сохранением переносов строк. Увеличен отступ перед списком "Устройства без связи".
     **OFFLINE:** В полный отчет добавлены устройства, которые потеряли связь.
     
     **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
-
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_RU.yaml
 
   input:
@@ -55,7 +51,7 @@ blueprint:
           integration: mobile_app
     
     telegram_notify_target:
-      name: 💬 Целевые уведомления Telegram
+      name: 💬 Уведомления Telegram
       description: Выберите сущности вашего сервиса Telegram (notify.telegram_bot_...).
       default:
         entity_id: []
@@ -64,15 +60,35 @@ blueprint:
           entity:
             - domain: notify
 
+    vk_notify_target:
+      name: "💬 Уведомления VK Notify"
+      description: "Выберите сущности VK Notify. Отправка будет без HTML-тегов, но с сохранением структуры списка."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    max_notify_target:
+      name: "💬 Уведомления Max Notify"
+      description: "Выберите сущности Max Notify. Отправка в формате HTML (в настройках интеграции Max должен быть выбран HTML)."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
     send_full_report_option:
-      name: 📊 Отправлять Полный отчет вторым сообщением (Telegram)?
-      description: Включите для получения полного списка всех батарей.
+      name: 📊 Отправлять Полный отчет вторым сообщением?
+      description: Включите для получения полного списка всех батарей во все выбранные мессенджеры.
       default: false
       selector:
         boolean:
 
     full_report_days:
-      name: 📅 Дни недели для ПОЛНОГО ОТЧЕТА (Telegram)
+      name: 📅 Дни недели для ПОЛНОГО ОТЧЕТА
       description: Выберите дни для полного отчета. Если пусто — каждый день (при включенной опции).
       default: []
       selector:
@@ -160,7 +176,7 @@ blueprint:
         text:
     text_rechargeable_type:
       name: 📝 Название встроенного АКБ
-      default: "Встроеный АКБ"
+      default: "Встроенный АКБ"
       selector:
         text:
     text_unknown_type:
@@ -224,6 +240,8 @@ blueprint:
 variables:
   mobile_device_id: !input mobile_notify_target
   telegram_notify_entities: !input telegram_notify_target 
+  vk_notify_target: !input vk_notify_target
+  max_notify_target: !input max_notify_target
   critical_threshold: !input critical_level
   excluded_entity_ids: !input excluded_sensors
   send_full_report: !input send_full_report_option
@@ -250,6 +268,15 @@ variables:
   title_short_charge_low: !input title_short_charge_low
   title_short_charge_ok: !input title_short_charge_ok
   title_full_report: !input title_full_report
+
+  # --- Target logic ---
+  vk_targets: >-
+    {% set raw = vk_notify_target.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+    
+  max_targets: >-
+    {% set raw = max_notify_target.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
 
 trigger:
   - platform: time
@@ -457,7 +484,6 @@ action:
       full_report_message: >
         {% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %}
         {% set header = title_full_report %}
-        {# Добавлено \n\n перед offline_sensors_report для визуального отступа #}
         {{ header ~ '\n' ~ total_text ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary ~ '\n\n' ~ offline_sensors_report }}
 
 
@@ -483,7 +509,7 @@ action:
                   - condition: template
                     value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
                 sequence:
-                  - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+                  - action: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
@@ -491,7 +517,7 @@ action:
                         {% else %}
                           {{ title_short_replace_ok }}
                         {% endif %}
-                      message: "{{ disposable_message | striptags }}" 
+                      message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}" 
           
           # 2.2 Telegram Bot (HTML)
           - alias: Telegram - Определить целевые ID чатов для Отчета 1
@@ -518,7 +544,7 @@ action:
                   - condition: template
                     value_template: "{{ target_chat_ids | length > 0 }}" 
                 sequence:
-                  - service: telegram_bot.send_message
+                  - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}" 
                       message: |
@@ -530,7 +556,52 @@ action:
                         {% endif %}
                         {{ header ~ "\n\n" ~ report_body }}
                       parse_mode: html
-  
+                      
+          # 2.3 VK Notify (Plain text)
+          - alias: VK Notify - Отчет о незаряжаемых
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ vk_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ vk_targets }}"
+                    data:
+                      title: >
+                        {% if disposable_message.startswith('⚠️') %}
+                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
+                        {% else %}
+                          {{ title_short_replace_ok }}
+                        {% endif %}
+                      message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+
+          # 2.4 Max Notify (HTML)
+          - alias: Max Notify - Отчет о незаряжаемых
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ max_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ max_targets }}"
+                    data:
+                      title: >
+                        {% if disposable_message.startswith('⚠️') %}
+                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
+                        {% else %}
+                          {{ title_short_replace_ok }}
+                        {% endif %}
+                      message: |
+                        {% set report_body = disposable_message %}
+                        {% if report_body.startswith('⚠️') %}
+                          {% set header = '<b>' ~ title_short_replace_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
+                        {% else %}
+                          {% set header = '<b>' ~ title_short_replace_ok ~ '</b>' %}
+                        {% endif %}
+                        {{ header ~ "\n\n" ~ report_body }}
+
   # ----------------------------------------------------------------------
   # 3. ОТПРАВКА ОТЧЕТА 2: ЗАРЯЖАЕМЫЕ (ЗАРЯДКА)
   # ----------------------------------------------------------------------
@@ -553,7 +624,7 @@ action:
                   - condition: template
                     value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
                 sequence:
-                  - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+                  - action: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
@@ -561,7 +632,7 @@ action:
                         {% else %}
                           {{ title_short_charge_ok }}
                         {% endif %}
-                      message: "{{ rechargeable_message | striptags }}"
+                      message: "{{ rechargeable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
           
           # 3.2 Telegram Bot (HTML)
           - alias: Telegram - Определить целевые ID чатов для Отчета 2
@@ -588,7 +659,7 @@ action:
                   - condition: template
                     value_template: "{{ target_chat_ids | length > 0 }}"
                 sequence:
-                  - service: telegram_bot.send_message
+                  - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}" 
                       message: |
@@ -600,6 +671,51 @@ action:
                         {% endif %}
                         {{ header ~ "\n\n" ~ report_body }}
                       parse_mode: html
+                      
+          # 3.3 VK Notify (Plain text)
+          - alias: VK Notify - Отчет о заряжаемых
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ vk_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ vk_targets }}"
+                    data:
+                      title: >
+                        {% if rechargeable_message.startswith('⚠️') %}
+                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
+                        {% else %}
+                          {{ title_short_charge_ok }}
+                        {% endif %}
+                      message: "{{ rechargeable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+
+          # 3.4 Max Notify (HTML)
+          - alias: Max Notify - Отчет о заряжаемых
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ max_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ max_targets }}"
+                    data:
+                      title: >
+                        {% if rechargeable_message.startswith('⚠️') %}
+                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
+                        {% else %}
+                          {{ title_short_charge_ok }}
+                        {% endif %}
+                      message: |
+                        {% set report_body = rechargeable_message %}
+                        {% if report_body.startswith('⚠️') %}
+                          {% set header = '<b>' ~ title_short_charge_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
+                        {% else %}
+                          {% set header = '<b>' ~ title_short_charge_ok ~ '</b>' %}
+                        {% endif %}
+                        {{ header ~ "\n\n" ~ report_body }}
   
   # ----------------------------------------------------------------------
   # 4. ОТПРАВКА ОТЧЕТА 3: ПОЛНЫЙ СПИСОК (ОПЦИОНАЛЬНО)
@@ -622,11 +738,11 @@ action:
         {% endfor %}
         {{ ns.target_ids }}
     
-  - alias: Telegram - Отправить Полный отчет (HTML)
+  - alias: Отправить Полный отчет
     choose:
       - conditions:
           - condition: template
-            value_template: "{{ target_chat_ids | length > 0 and send_full_report }}"
+            value_template: "{{ send_full_report }}"
           - condition: template
             value_template: >
               {% set selected_days = full_report_days %}
@@ -636,10 +752,44 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          - service: telegram_bot.send_message
-            data:
-              chat_id: "{{ target_chat_ids }}" 
-              message: "{{ full_report_message }}"
-              parse_mode: html
-    
+          # 4.1 Полный отчет - Telegram
+          - alias: Telegram - Отправить Полный отчет
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_chat_ids | length > 0 }}"
+                sequence:
+                  - action: telegram_bot.send_message
+                    data:
+                      chat_id: "{{ target_chat_ids }}" 
+                      message: "{{ full_report_message }}"
+                      parse_mode: html
+                      
+          # 4.2 Полный отчет - VK Notify
+          - alias: VK Notify - Отправить Полный отчет
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ vk_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ vk_targets }}"
+                    data:
+                      message: "{{ full_report_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+                      
+          # 4.3 Полный отчет - Max Notify (HTML)
+          - alias: Max Notify - Отправить Полный отчет
+            choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ max_targets | length > 0 }}"
+                sequence:
+                  - action: notify.send_message
+                    target:
+                      entity_id: "{{ max_targets }}"
+                    data:
+                      title: "{{ title_full_report | replace('<b>', '') | replace('</b>', '') }}"
+                      message: "{{ full_report_message }}"
+  
 mode: single

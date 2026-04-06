@@ -1,8 +1,8 @@
 blueprint:
-  name: Скриншот по движению + Telegram
+  name: Скриншот по движению + Telegram (Выбор сущности)
   description: >
     При обнаружении движения делает скриншот и 
-    отправляет его в указанный чат Telegram.
+    отправляет его в выбранные чаты Telegram (парсинг из notify).
   domain: automation
   
   input:
@@ -20,11 +20,15 @@ blueprint:
       selector:
         entity:
           domain: camera
-    target_chat_id:
-      name: ID чата Telegram (chat_id)
-      description: "Укажите ваш ID в Telegram или ID группы (например: 123456789 или -123456789). Интеграция telegram_bot должна быть предварительно настроена."
+    telegram_notify_target:
+      name: 💬 Уведомления Telegram
+      description: Выберите сущности вашего сервиса Telegram (обычно называются notify.telegram_bot_...).
+      default:
+        entity_id: []
       selector:
-        text:
+        target:
+          entity:
+            - domain: notify
 
 mode: single
 
@@ -35,19 +39,33 @@ trigger:
 
 action:
   # ----------------------------------------------------------------
-  # 1. ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
+  # 1. ОБЪЯВЛЕНИЕ И ПАРСИНГ ПЕРЕМЕННЫХ
   # ----------------------------------------------------------------
   - variables:
       camera_entity: !input target_camera
+      telegram_notify_entities: !input telegram_notify_target
       
       # Генерируем уникальное имя файла
       filename: "motion_{{ now().strftime('%Y%m%d_%H%M%S') }}"
-      
-      # Полный системный путь для сохранения картинки и отправки её в Telegram
       path_snap: "/config/www/snapshots/{{ filename }}.jpg"
-      
-      # Получаем красивое имя камеры для подписи
       camera_name: "{{ state_attr(camera_entity, 'friendly_name') or 'Камера' }}"
+      
+      # Парсинг ID чатов из названий выбранных notify-сущностей
+      target_chat_ids: >-
+        {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+        {% set selected_entities = [selected_entities_raw] | flatten %}
+        {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+        {% set ns = namespace(target_ids=[]) %}
+        {% for id_string in chat_id_strings %}
+          {% set cleaned_id = id_string | string | trim %}
+          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+            {% set id_with_hyphen = '-' ~ cleaned_id %}
+            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+          {% else %}
+            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.target_ids }}
 
   # ----------------------------------------------------------------
   # 2. ДЕЙСТВИЯ
@@ -60,9 +78,14 @@ action:
     data:
       filename: "{{ path_snap }}"
 
-  # Шаг 2: Отправляем в Telegram
-  - action: telegram_bot.send_photo
-    data:
-      chat_id: !input target_chat_id
-      file: "{{ path_snap }}"
-      caption: "Тревога: {{ camera_name }}\nДвижение зафиксировано!"
+  # Шаг 2: Отправляем фото (только если выбраны получатели)
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ target_chat_ids | length > 0 }}"
+        sequence:
+          - action: telegram_bot.send_photo
+            data:
+              chat_id: "{{ target_chat_ids }}"
+              file: "{{ path_snap }}"
+              caption: "Тревога: {{ camera_name }}\nДвижение зафиксировано!"

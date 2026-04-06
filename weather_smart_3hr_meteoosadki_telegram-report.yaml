@@ -1,8 +1,9 @@
 blueprint:
-  name: "Оповещение: Осадки (Активная проверка) v1.4"
+  name: "Оповещение: Осадки (Активная проверка) v1.5"
   description: >
     Проверяет погоду по расписанию. Если в ближайшие 3 ЧАСА (включая текущий) ожидаются осадки — шлет уведомление.
-    Фильтрует прошедшее время. Исправлена ошибка областей видимости Jinja2. Заменен устаревший target на chat_id.
+    Поддерживает Telegram (HTML), Max Notify (HTML) и VK Notify (Plain Text).
+    Фильтрует прошедшее время.
   domain: automation
 
   input:
@@ -41,6 +42,26 @@ blueprint:
           entity:
             - domain: notify
 
+    vk_notify_target:
+      name: "💬 Получатель VK Notify"
+      description: Выберите сущности VK Notify. Отправка будет без HTML-тегов.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    max_notify_target:
+      name: "💬 Получатель Max Notify"
+      description: Выберите сущности Max Notify. Отправка в формате HTML.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
     map_url:
       name: "Ссылка на карту (Windy)"
       description: "Чистая ссылка (https://...) для кнопки."
@@ -50,12 +71,14 @@ blueprint:
 
 variables:
   weather_entity: !input weather_entity
-  telegram_notify_target: !input telegram_notify_target
+  telegram_input: !input telegram_notify_target
+  vk_input: !input vk_notify_target
+  max_input: !input max_notify_target
   map_link: !input map_url
 
   # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ---
   target_chat_ids: >-
-    {% set selected_entities_raw = telegram_notify_target.entity_id | default([]) %}
+    {% set selected_entities_raw = telegram_input.entity_id | default([]) %}
     {% set selected_entities = [selected_entities_raw] | flatten %}
     {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
     {% set ns = namespace(target_ids=[]) %}
@@ -68,18 +91,27 @@ variables:
         {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
       {% endif %}
     {% endfor %}
-    {{ ns.target_ids }}
+    {{ ns.target_ids | reject('==', '') | list }}
+
+  vk_targets: >-
+    {% set raw = vk_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+
+  max_targets: >-
+    {% set raw = max_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
 
 trigger:
   - platform: time_pattern
     minutes: !input check_frequency
 
 action:
+  # Проверка, выбран ли хотя бы один получатель
   - if:
       - condition: template
-        value_template: "{{ target_chat_ids | length == 0 }}"
+        value_template: "{{ (target_chat_ids | length == 0) and (vk_targets | length == 0) and (max_targets | length == 0) }}"
     then:
-      - stop: "Не выбраны получатели Telegram"
+      - stop: "Не выбраны получатели ни для одной из платформ"
 
   - action: weather.get_forecasts
     target:
@@ -107,28 +139,23 @@ action:
           {{ time_filter.future_forecast[:3] | selectattr('condition', 'in', bad_weather) | list | count > 0 }}
           
     then:
-      - action: telegram_bot.send_message
-        metadata: {}
-        data:
-          chat_id: "{{ target_chat_ids }}"
-          parse_mode: html
-          title: "☔️ Осадки в ближайшее время!"
-          message: >
+      # Формируем сообщения один раз перед отправкой
+      - variables:
+          msg_title: "☔️ Осадки в ближайшее время!"
+          
+          msg_text_html: >-
             {%- set forecast = weather_data[weather_entity].forecast -%}
             {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
             {%- set mapper = {
               'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈',
               'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'
             } -%}
-            
-            {# Фильтруем прошлое #}
             {%- set time_filter = namespace(future_forecast=[]) -%}
             {%- for h in forecast -%}
               {%- if (as_timestamp(h.datetime) + 3600) > as_timestamp(now()) -%}
                 {%- set time_filter.future_forecast = time_filter.future_forecast + [h] -%}
               {%- endif -%}
             {%- endfor -%}
-
             <b>Внимание, прогноз на 3 часа:</b>
             {%- set ns = namespace(blocks=[], current_block=[]) -%}
             {%- for hour in time_filter.future_forecast[:3] if hour.condition in bad_weather -%}
@@ -145,7 +172,6 @@ action:
             {%- if ns.current_block -%}
               {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
             {%- endif -%}
-            
             {%- for block in ns.blocks -%}
               {%- set start = block[0] -%}
               {%- set end = block[-1] -%}
@@ -157,7 +183,86 @@ action:
             {{'\n'}}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }}</b> {{ c_name }} ({{ start.temperature }}°C)
               {%- endif -%}
             {%- endfor -%}
-            
             {% if map_link != '' %}
-            {{'\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
+            {{'\n\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
             {% endif %}
+
+          msg_text_plain: >-
+            {%- set forecast = weather_data[weather_entity].forecast -%}
+            {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
+            {%- set mapper = {
+              'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈',
+              'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'
+            } -%}
+            {%- set time_filter = namespace(future_forecast=[]) -%}
+            {%- for h in forecast -%}
+              {%- if (as_timestamp(h.datetime) + 3600) > as_timestamp(now()) -%}
+                {%- set time_filter.future_forecast = time_filter.future_forecast + [h] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            Внимание, прогноз на 3 часа:
+            {%- set ns = namespace(blocks=[], current_block=[]) -%}
+            {%- for hour in time_filter.future_forecast[:3] if hour.condition in bad_weather -%}
+              {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
+              {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
+                {%- set ns.current_block = ns.current_block + [hour] -%}
+              {%- else -%}
+                {%- if ns.current_block -%}
+                  {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+                {%- endif -%}
+                {%- set ns.current_block = [hour] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if ns.current_block -%}
+              {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
+            {%- endif -%}
+            {%- for block in ns.blocks -%}
+              {%- set start = block[0] -%}
+              {%- set end = block[-1] -%}
+              {%- set c_name = mapper[start.condition] if start.condition in mapper else start.condition -%}
+              {%- if start == end -%}
+            {{'\n'}}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }} {{ c_name }} ({{ start.temperature }}°C)
+              {%- else -%}
+                {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
+            {{'\n'}}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }} {{ c_name }} ({{ start.temperature }}°C)
+              {%- endif -%}
+            {%- endfor -%}
+            {% if map_link != '' %}
+            {{'\n\n'}}🗺 Карта осадков: {{ map_link }}
+            {% endif %}
+
+      # 1. Отправка в Telegram
+      - if:
+          - condition: template
+            value_template: "{{ target_chat_ids | length > 0 }}"
+        then:
+          - action: telegram_bot.send_message
+            data:
+              chat_id: "{{ target_chat_ids }}"
+              parse_mode: html
+              title: "{{ msg_title }}"
+              message: "{{ msg_text_html }}"
+
+      # 2. Отправка в VK Notify
+      - if:
+          - condition: template
+            value_template: "{{ vk_targets | length > 0 }}"
+        then:
+          - action: notify.send_message
+            target:
+              entity_id: "{{ vk_targets }}"
+            data:
+              title: "{{ msg_title }}"
+              message: "{{ msg_text_plain }}"
+
+      # 3. Отправка в Max Notify
+      - if:
+          - condition: template
+            value_template: "{{ max_targets | length > 0 }}"
+        then:
+          - action: notify.send_message
+            target:
+              entity_id: "{{ max_targets }}"
+            data:
+              title: "{{ msg_title }}"
+              message: "{{ msg_text_html }}"

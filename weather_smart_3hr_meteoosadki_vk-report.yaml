@@ -1,14 +1,15 @@
 blueprint:
-  name: "Оповещение: Осадки (VK Native Only) v1.1"
+  name: "Осадки: Утро (24ч) + Мониторинг (3ч) v2.1"
   description: >
     Уведомление о плохой погоде с поддержкой редактирования и удаления сообщений ВКонтакте.
+    Две логики в одной автоматизации: Утренний дайджест (на 24 часа) и Оперативный мониторинг (на 3 часа).
     
     📋 **ПОДГОТОВКА (ОБЯЗАТЕЛЬНО):**
-    Для работы в режимах «Заменять» и «Удалять» боту нужна память.
+    Для работы в режимах «Заменять» и «Удалять» боту нужна память. Так как здесь две независимые функции, вам нужно создать **ДВА** помощника.
     1. Перейдите в **Настройки** -> **Устройства и службы** -> **Вспомогательные элементы**.
     2. Нажмите **Создать вспомогательный элемент** -> **Текст** (input_text).
-    3. Назовите его (например, `VK Weather ID`) и сохраните. 
-    4. Выберите этот созданный элемент в поле «Помощник для ID» ниже.
+    3. Назовите его (например, `VK Погода Утро`) и сохраните. Повторите процесс для второго (например, `VK Погода Мониторинг`).
+    4. Выберите созданные элементы в соответствующих полях «Хелпер для ID» ниже.
 
     ⚠️ **ОСОБЕННОСТИ РЕЖИМОВ «ЗАМЕНЯТЬ» И «УДАЛЯТЬ»:**
     1. **Зависимость:** Оба этих режима **не будут работать** без выбранного «Помощника для ID».
@@ -16,42 +17,39 @@ blueprint:
     3. **Ручное удаление:** Если вы удалите сообщение руками в VK, бот не сможет его отредактировать или удалить автоматически (выдаст ошибку).
     4. **Как починить:** Если всё «сломалось», переключите режим на «Спамить», дождитесь одного уведомления, а затем верните нужный режим.
     
+    🛠 **ТЕСТИРОВАНИЕ:** При ручном запуске (кнопкой "Запустить") автоматизация всегда выполняет ветку Мониторинга. Если в ближайшие 3 часа по прогнозу сухо, бот НИЧЕГО не пришлет (защита от спама).
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_3hr_meteoosadki_vk-report.yaml
-
   input:
     weather_entity:
       name: "Погодная сущность"
       selector:
         entity:
           domain: weather
-    check_frequency:
-      name: "Частота проверки"
-      default: "/30"
-      selector:
-        select:
-          options:
-            - label: "Каждые 10 минут"
-              value: "/10"
-            - label: "Каждые 30 минут"
-              value: "/30"
-            - label: "Раз в час"
-              value: "0"
     vk_notify_target:
       name: "💬 VK: Получатель"
       selector:
         entity:
           filter:
             - integration: vk_notify
-    vk_msg_id_helper:
-      name: "💾 VK: Помощник для ID"
-      description: "Выберите 'input_text'. Бот записывает туда ID сообщения. **Без этого хелпера режимы 'Заменять' и 'Удалять' работать не будут!**"
+
+    # --- УТРЕННИЙ БЛОК (24 ЧАСА) ---
+    enable_morning:
+      name: "☀️ Включить утренний отчет (на 24 часа)"
+      default: true
+      selector:
+        boolean: {}
+    morning_time:
+      name: "⏰ Время утреннего отчета"
+      default: "08:00:00"
+      selector:
+        time: {}
+    morning_helper:
+      name: "💾 Хелпер для утреннего ID"
       selector:
         entity:
           domain: input_text
-    vk_mode:
-      name: "⚙️ VK: Режим работы"
-      description: "Выберите, как бот должен вести себя с сообщениями. Для 'Заменять' и 'Удалять' обязателен хелпер выше."
+    morning_mode:
+      name: "⚙️ Режим утреннего отчета"
       default: "edit"
       selector:
         select:
@@ -62,24 +60,68 @@ blueprint:
               value: "delete"
             - label: "Спамить (Просто новые сообщения)"
               value: "spam"
+
+    # --- МОНИТОРИНГ (3 ЧАСА) ---
+    enable_monitor:
+      name: "🔍 Включить мониторинг (на ближайшие 3 часа)"
+      default: true
+      selector:
+        boolean: {}
+    monitor_frequency:
+      name: "⏱ Частота проверок"
+      default: "/30"
+      selector:
+        select:
+          options:
+            - { label: "15 минут", value: "/15" }
+            - { label: "30 минут", value: "/30" }
+            - { label: "1 час", value: "0" }
+    monitor_helper:
+      name: "💾 Хелпер для ID мониторинга"
+      selector:
+        entity:
+          domain: input_text
+    monitor_mode:
+      name: "⚙️ Режим мониторинга"
+      default: "edit"
+      selector:
+        select:
+          options:
+            - label: "Заменять (Редактировать)"
+              value: "edit"
+            - label: "Удалять старое и присылать новое"
+              value: "delete"
+            - label: "Спамить (Просто новые сообщения)"
+              value: "spam"
+
     map_url:
-      name: "🗺 Ссылка на карту Windy"
-      default: "https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=55.672&lon=37.855"
+      name: "🗺 Ссылка на карту"
+      default: "https://embed.windy.com/embed.html"
       selector:
         text:
 
 variables:
   weather_entity: !input weather_entity
-  vk_helper: !input vk_msg_id_helper
-  vk_mode: !input vk_mode
-  map_link: !input map_url
   vk_target: !input vk_notify_target
-  # Загружаем ID из хелпера. Если там пусто или мусор — возвращаем пустую строку.
-  saved_cmid: "{{ states(vk_helper) | trim if states(vk_helper) not in ['unknown', 'unavailable', ''] else '' }}"
+  map_link: !input map_url
+  
+  m_enabled: !input enable_morning
+  m_helper: !input morning_helper
+  m_mode: !input morning_mode
+  m_id: "{{ states(m_helper) if states(m_helper) not in ['unknown', 'unavailable', ''] else '' }}"
+  
+  p_enabled: !input enable_monitor
+  p_helper: !input monitor_helper
+  p_mode: !input monitor_mode
+  p_id: "{{ states(p_helper) if states(p_helper) not in ['unknown', 'unavailable', ''] else '' }}"
 
 trigger:
+  - platform: time
+    at: !input morning_time
+    id: "morning_trigger"
   - platform: time_pattern
-    minutes: !input check_frequency
+    minutes: !input monitor_frequency
+    id: "monitor_trigger"
 
 action:
   - action: weather.get_forecasts
@@ -89,33 +131,26 @@ action:
       type: hourly
     response_variable: weather_data
 
-  - variables:
-      bad_weather: ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail']
-      is_bad: >
-        {% set fc = weather_data[weather_entity].forecast %}
-        {% set ns = namespace(found=false) %}
-        {% for h in fc if h.datetime is defined and (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
-          {% if loop.index <= 3 and h.condition in bad_weather %}
-            {% set ns.found = true %}
-          {% endif %}
-        {% endfor %}
-        {{ ns.found }}
-
   - choose:
-      # --- ВАРИАНТ А: ПЛОХАЯ ПОГОДА ---
+      # ==========================================
+      # ВЕТКА 1: УТРЕННИЙ ДАЙДЖЕСТ (СТРОГО 24 ЧАСА)
+      # ==========================================
       - conditions:
+          - condition: trigger
+            id: "morning_trigger"
           - condition: template
-            value_template: "{{ is_bad == 'True' or is_bad == true }}"
+            value_template: "{{ m_enabled }}"
         sequence:
           - variables:
-              msg_title: "☔️ Осадки в ближайшее время!"
-              msg_body_base: >
+              morning_msg: >
+                {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
                 {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %}
                 {% set fc = weather_data[weather_entity].forecast %}
-                {% set ns = namespace(future=[], blocks=[], current_block=[], out="") %}
-                {% for h in fc if h.datetime is defined and (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
-                  {% if ns.future | count < 3 %}
+                {% set ns = namespace(future=[], blocks=[], current_block=[], count=0, out="") %}
+                {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
+                  {% if ns.count < 24 %}
                     {% set ns.future = ns.future + [h] %}
+                    {% set ns.count = ns.count + 1 %}
                   {% endif %}
                 {% endfor %}
                 {% for hour in ns.future if hour.condition in bad_weather %}
@@ -129,106 +164,206 @@ action:
                 {% endfor %}
                 {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
                 
-                {% set ns.out = "Внимание! Погода испортится. Подготовьте зонты ☂️:\n" %}
-                
-                {% for block in ns.blocks %}
-                  {% set start = block[0] %}
-                  {% set end = block[-1] %}
-                  {% set c_name = mapper.get(start.condition, start.condition) %}
-                  {% if start == end %}
-                    {% set ns.out = ns.out ~ "🕒 " ~ (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ " " ~ c_name ~ " (" ~ start.temperature ~ "°C)\n" %}
+                {% if ns.blocks | count > 0 %}
+                  {% set ns.out = "Доброе утро! ☕️\nПрогноз осадков на ближайшие 24 часа:\n" %}
+                  {% set ns.min_temp = 50 %}
+                  {% for block in ns.blocks %}
+                    {% set start, end = block[0], block[-1] %}
+                    {% if start.temperature | float < ns.min_temp %}{% set ns.min_temp = start.temperature | float %}{% endif %}
+                    {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ ((as_timestamp(end.datetime, 0) + 3600) | timestamp_custom('%H:%M')) %}
+                    {% set ns.out = ns.out ~ "🕒 " ~ t_range ~ " — " ~ mapper.get(start.condition, start.condition) ~ " (" ~ start.temperature ~ "°C)\n" %}
+                  {% endfor %}
+                  
+                  {% if ns.min_temp <= 7 %}
+                    {% set ns.out = ns.out ~ "\n🥶 Холодно и сыро. Надеюсь, вы тепло одеты и зонт с вами!" %}
                   {% else %}
-                    {% set end_time = as_timestamp(end.datetime, 0) + 3600 %}
-                    {% set ns.out = ns.out ~ "🕒 " ~ (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ (end_time | timestamp_custom('%H:%M')) ~ " " ~ c_name ~ " (" ~ start.temperature ~ "°C)\n" %}
+                    {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
+                  {% endif %}
+                {% else %}
+                  {% set ns.out = "Доброе утро! ☀️\nВ ближайшие 24 часа осадков не ожидается. Хорошего дня!" %}
+                {% endif %}
+                {{ ns.out | trim }}
+              
+              vk_kb: >-
+                {% if map_link != '' %}
+                {"inline": true, "buttons": [[{"action": {"type": "open_link", "link": "{{ map_link }}", "label": "🗺 Карта Windy"}}]]}
+                {% else %}null{% endif %}
+          
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ m_mode == 'edit' and m_id != '' }}"
+                sequence:
+                  - action: vk_notify.edit_message
+                    continue_on_error: true
+                    data:
+                      entity_id: "{{ vk_target }}"
+                      message: "🌦 Прогноз на сутки\n{{ morning_msg }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                      conversation_message_id: "{{ m_id | int(0) }}"
+                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+              
+              - conditions:
+                  - condition: template
+                    value_template: "{{ m_mode == 'delete' }}"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ m_id != '' }}"
+                    then:
+                      - action: vk_notify.delete_message
+                        continue_on_error: true
+                        data:
+                          entity_id: "{{ vk_target }}"
+                          conversation_message_id: "{{ m_id | int(0) }}"
+                  - action: vk_notify.send_message
+                    data:
+                      entity_id: "{{ vk_target }}"
+                      title: "🌦 Прогноз на сутки"
+                      message: "{{ morning_msg }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                    response_variable: m_ans_del
+                  - action: input_text.set_value
+                    target: { entity_id: "{{ m_helper }}" }
+                    data: { value: "{{ (m_ans_del.values() | first).conversation_message_id }}" }
+
+            default:
+              - action: vk_notify.send_message
+                data:
+                  entity_id: "{{ vk_target }}"
+                  title: "🌦 Прогноз на сутки"
+                  message: "{{ morning_msg }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                  keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                response_variable: m_ans_spam
+              - action: input_text.set_value
+                target: { entity_id: "{{ m_helper }}" }
+                data: { value: "{{ (m_ans_spam.values() | first).conversation_message_id }}" }
+
+      # ==========================================
+      # ВЕТКА 2: МОНИТОРИНГ (3 ЧАСА) + РУЧНОЙ ЗАПУСК
+      # ==========================================
+      - conditions:
+          - condition: template
+            value_template: "{{ p_enabled }}"
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: "monitor_trigger"
+              - condition: template
+                value_template: "{{ trigger is not defined or trigger.platform is none }}"
+        sequence:
+          - variables:
+              rain_list: >
+                {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
+                {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %}
+                {% set fc = weather_data[weather_entity].forecast %}
+                {% set ns = namespace(out="", count=0, min_temp=50) %}
+                {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
+                  {% if ns.count < 3 %}
+                    {% if h.condition in bad_weather %}
+                      {% set ns.out = ns.out ~ "🕒 " ~ (as_timestamp(h.datetime, 0) | timestamp_custom('%H:%M')) ~ " — " ~ mapper.get(h.condition, h.condition) ~ " (" ~ h.temperature ~ "°C)\n" %}
+                      {% if h.temperature | float < ns.min_temp %}{% set ns.min_temp = h.temperature | float %}{% endif %}
+                    {% endif %}
+                    {% set ns.count = ns.count + 1 %}
                   {% endif %}
                 {% endfor %}
                 
-                {% set ns.out = ns.out ~ "\n🔄 Обновлено: " ~ now().strftime('%H:%M:%S') %}
+                {% if ns.out != "" %}
+                  {% if ns.min_temp <= 7 %}
+                    {% set ns.out = ns.out ~ "\n🥶 Холодно и сыро. Надеюсь, вы тепло одеты и зонт с вами!" %}
+                  {% else %}
+                    {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
+                  {% endif %}
+                {% endif %}
                 {{ ns.out | trim }}
               
               vk_kb: >-
                 {% if map_link != '' %}
                 {"inline": true, "buttons": [[{"action": {"type": "open_link", "link": "{{ map_link }}", "label": "🗺 Карта осадков"}}]]}
                 {% else %}null{% endif %}
-
+          
           - choose:
-              # РЕДАКТИРОВАНИЕ (Нужен ID)
+              # --- ПЛОХАЯ ПОГОДА В ОКНЕ 3 ЧАСОВ ---
               - conditions:
                   - condition: template
-                    value_template: "{{ vk_mode == 'edit' and saved_cmid != '' }}"
+                    value_template: "{{ rain_list != '' }}"
                 sequence:
-                  - action: vk_notify.edit_message
-                    continue_on_error: true
-                    data:
-                      entity_id: "{{ vk_target }}"
-                      message: "{{ msg_title }}\n{{ msg_body_base }}"
-                      conversation_message_id: "{{ saved_cmid | int(0) }}"
-                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
-              
-              # УДАЛЕНИЕ И ПЕРЕОТПРАВКА (Нужен ID для удаления)
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_mode == 'delete' }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ saved_cmid != '' }}"
-                    then:
-                      - action: vk_notify.delete_message
-                        continue_on_error: true
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'edit' and p_id != '' }}"
+                        sequence:
+                          - action: vk_notify.edit_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              message: "🌦 Оперативный прогноз\nВ ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                              keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                      
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'delete' }}"
+                        sequence:
+                          - if:
+                              - condition: template
+                                value_template: "{{ p_id != '' }}"
+                            then:
+                              - action: vk_notify.delete_message
+                                continue_on_error: true
+                                data:
+                                  entity_id: "{{ vk_target }}"
+                                  conversation_message_id: "{{ p_id | int(0) }}"
+                          - action: vk_notify.send_message
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              title: "🌦 Оперативный прогноз"
+                              message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                              keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                            response_variable: p_ans_del
+                          - action: input_text.set_value
+                            target: { entity_id: "{{ p_helper }}" }
+                            data: { value: "{{ (p_ans_del.values() | first).conversation_message_id }}" }
+                      
+                    default:
+                      - action: vk_notify.send_message
                         data:
                           entity_id: "{{ vk_target }}"
-                          conversation_message_id: "{{ saved_cmid | int(0) }}"
-                  - action: vk_notify.send_message
-                    data:
-                      entity_id: "{{ vk_target }}"
-                      title: "{{ msg_title }}"
-                      message: "{{ msg_body_base }}"
-                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
-                    response_variable: vk_ans_del
+                          title: "🌦 Оперативный прогноз"
+                          message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                          keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                        response_variable: p_ans_spam
+                      - action: input_text.set_value
+                        target: { entity_id: "{{ p_helper }}" }
+                        data: { value: "{{ (p_ans_spam.values() | first).conversation_message_id }}" }
+
+              # --- ПОГОДА НАЛАДИЛАСЬ (НО СООБЩЕНИЕ ВИСИТ) ---
+              - conditions:
+                  - condition: template
+                    value_template: "{{ rain_list == '' and p_id != '' }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'edit' }}"
+                        sequence:
+                          - action: vk_notify.edit_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              message: "✅ Оперативный мониторинг\nОсадков в ближайшие 3 часа не ожидается. Небо прояснилось! 🌤\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                              keyboard: {"inline": true, "buttons": []}
+                      
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'delete' }}"
+                        sequence:
+                          - action: vk_notify.delete_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                  
                   - action: input_text.set_value
-                    target: { entity_id: "{{ vk_helper }}" }
-                    data: { value: "{{ (vk_ans_del.values() | first).conversation_message_id }}" }
-
-            # ДЕФОЛТ: Если ID нет или режим "Спам"
-            default:
-              - action: vk_notify.send_message
-                data:
-                  entity_id: "{{ vk_target }}"
-                  title: "{{ msg_title }}"
-                  message: "{{ msg_body_base }}"
-                  keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
-                response_variable: vk_ans_spam
-              - action: input_text.set_value
-                target: { entity_id: "{{ vk_helper }}" }
-                data: { value: "{{ (vk_ans_spam.values() | first).conversation_message_id }}" }
-
-      # --- ВАРИАНТ Б: СОЛНЦЕ ---
-      - conditions:
-          - condition: template
-            value_template: "{{ (is_bad == 'False' or is_bad == false) and saved_cmid != '' }}"
-        sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_mode == 'edit' }}"
-                sequence:
-                  - action: vk_notify.edit_message
-                    continue_on_error: true
-                    data:
-                      entity_id: "{{ vk_target }}"
-                      message: "☀️ Погода наладилась! Осадков в ближайшее время не ожидается.\n\n🔄 Обновлено: {{ now().strftime('%H:%M:%S') }}"
-                      conversation_message_id: "{{ saved_cmid | int(0) }}"
-                      keyboard: {"inline": true, "buttons": []}
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_mode == 'delete' }}"
-                sequence:
-                  - action: vk_notify.delete_message
-                    continue_on_error: true
-                    data:
-                      entity_id: "{{ vk_target }}"
-                      conversation_message_id: "{{ saved_cmid | int(0) }}"
-          - action: input_text.set_value
-            target: { entity_id: "{{ vk_helper }}" }
-            data: { value: "" }
+                    target: { entity_id: "{{ p_helper }}" }
+                    data: { value: "" }

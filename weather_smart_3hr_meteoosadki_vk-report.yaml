@@ -1,4 +1,4 @@
- blueprint:
+blueprint:
   name: "Осадки: Утро (24ч) + Мониторинг (3ч) v2.8"
   description: >
     Уведомление о плохой погоде с поддержкой редактирования и удаления сообщений ВКонтакте.
@@ -19,8 +19,9 @@
     
     🛠 **ТЕСТИРОВАНИЕ:** При ручном запуске (кнопкой "Запустить") автоматизация всегда выполняет ветку Мониторинга. Если в ближайшие 3 часа по прогнозу сухо, бот НИЧЕГО не пришлет (защита от спама).
   domain: automation
-
+  
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_3hr_meteoosadki_vk-report.yaml
+
   
   input:
     weather_entity:

@@ -1,37 +1,39 @@
 blueprint:
-  name: Защита штор и жалюзи от повреждений
+  name: Защита штор и жалюзи от повреждений (V2.1)
   description: >-
-    Автоматизация для защиты вертикальных жалюзи. Она управляет открытием и закрытием штор и жалюзи, предотвращая повреждения, которые могут возникнуть при их одновременном или некорректном движении.
+    Автоматизация для предотвращения коллизий между вертикальными жалюзи и шторами. 
+    
+    ВАЖНО: Убедитесь, что в настройках вашего шлюза (Zigbee2MQTT, ZHA и др.) для всех приводов:
+    1. Включено отображение позиции в процентах (0-100%).
+    2. Соблюден стандарт Home Assistant: 100% — ПОЛНОСТЬЮ ОТКРЫТО, 0% — ПОЛНОСТЬЮ ЗАКРЫТО.
+    Если у вас 100% это закрыто — включите инверсию (Invert) в настройках устройства в Z2M.
+    
     Принцип работы:
-    1. При открытии штор — сначала открываются жалюзи.
-    2. При закрытии жалюзи — сначала закрываются шторы.
+    1. При открытии штор — сначала открываются жалюзи (до >98%).
+    2. При закрытии жалюзи — сначала закрываются шторы (до <2%).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/cover_collision_protect.yaml
   input:
     right_curtain_cover:
       name: Привод правой шторы
-      description: Объект-привод для правой шторы. **Его открытие будет заблокировано до тех пор, пока правые жалюзи не будут полностью открыты.**
       selector:
         entity:
           domain: cover
           device_class: curtain
     left_curtain_cover:
       name: Привод левой шторы
-      description: Объект-привод для левой шторы. **Его открытие будет заблокировано до тех пор, пока левые жалюзи не будут полностью открыты.**
       selector:
         entity:
           domain: cover
           device_class: curtain
     right_blinds_cover:
       name: Привод правых жалюзи
-      description: Объект-привод для правых жалюзи. **Его закрытие будет заблокировано до тех пор, пока правая штора не будет полностью закрыта.**
       selector:
         entity:
           domain: cover
           device_class: blind
     left_blinds_cover:
       name: Привод левых жалюзи
-      description: Объект-привод для левых жалюзи. **Его закрытие будет заблокировано до тех пор, пока левая штора не будет полностью закрыта.**
       selector:
         entity:
           domain: cover
@@ -56,23 +58,22 @@ action:
       right_blinds: !input right_blinds_cover
       left_blinds: !input left_blinds_cover
   - choose:
-      # Логика для правой шторы
+      # --- ПРАВАЯ СТОРОНА: Открытие шторы ---
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.entity_id == right_curtain }}
+            value_template: "{{ trigger.entity_id == right_curtain }}"
         sequence:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_blinds, 'current_position') | int(0) == 100 }}"
+                    value_template: "{{ state_attr(right_blinds, 'current_position') | int(-1) >= 99 }}"
                 sequence:
                   - service: cover.open_cover
                     target:
                       entity_id: !input right_curtain_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_blinds, 'current_position') | int(0) < 99 }}"
+                    value_template: "{{ state_attr(right_blinds, 'current_position') | int(-1) < 99 }}"
                 sequence:
                   - service: cover.stop_cover
                     target:
@@ -81,30 +82,30 @@ action:
                     target:
                       entity_id: !input right_blinds_cover
                   - wait_for_trigger:
-                      - platform: state
+                      - platform: numeric_state
                         entity_id: !input right_blinds_cover
-                        to: open
+                        attribute: current_position
+                        above: 98
                   - service: cover.open_cover
                     target:
                       entity_id: !input right_curtain_cover
 
-      # Логика для левой шторы
+      # --- ЛЕВАЯ СТОРОНА: Открытие шторы ---
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.entity_id == left_curtain }}
+            value_template: "{{ trigger.entity_id == left_curtain }}"
         sequence:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_blinds, 'current_position') | int(0) == 100 }}"
+                    value_template: "{{ state_attr(left_blinds, 'current_position') | int(-1) >= 99 }}"
                 sequence:
                   - service: cover.open_cover
                     target:
                       entity_id: !input left_curtain_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_blinds, 'current_position') | int(0) < 99 }}"
+                    value_template: "{{ state_attr(left_blinds, 'current_position') | int(-1) < 99 }}"
                 sequence:
                   - service: cover.stop_cover
                     target:
@@ -113,30 +114,30 @@ action:
                     target:
                       entity_id: !input left_blinds_cover
                   - wait_for_trigger:
-                      - platform: state
+                      - platform: numeric_state
                         entity_id: !input left_blinds_cover
-                        to: open
+                        attribute: current_position
+                        above: 98
                   - service: cover.open_cover
                     target:
                       entity_id: !input left_curtain_cover
 
-      # Логика для правых жалюзи
+      # --- ПРАВАЯ СТОРОНА: Закрытие жалюзи ---
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.entity_id == right_blinds }}
+            value_template: "{{ trigger.entity_id == right_blinds }}"
         sequence:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(0) == 0 }}"
+                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(-1) != -1 and state_attr(right_curtain, 'current_position') | int(-1) <= 1 }}"
                 sequence:
                   - service: cover.close_cover
                     target:
                       entity_id: !input right_blinds_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(0) > 1 }}"
+                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(-1) > 1 or state_attr(right_curtain, 'current_position') == none }}"
                 sequence:
                   - service: cover.stop_cover
                     target:
@@ -145,30 +146,30 @@ action:
                     target:
                       entity_id: !input right_curtain_cover
                   - wait_for_trigger:
-                      - platform: state
+                      - platform: numeric_state
                         entity_id: !input right_curtain_cover
-                        to: closed
+                        attribute: current_position
+                        below: 2
                   - service: cover.close_cover
                     target:
                       entity_id: !input right_blinds_cover
-      
-      # Логика для левых жалюзи
+
+      # --- ЛЕВАЯ СТОРОНА: Закрытие жалюзи ---
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.entity_id == left_blinds }}
+            value_template: "{{ trigger.entity_id == left_blinds }}"
         sequence:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(0) == 0 }}"
+                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(-1) != -1 and state_attr(left_curtain, 'current_position') | int(-1) <= 1 }}"
                 sequence:
                   - service: cover.close_cover
                     target:
                       entity_id: !input left_blinds_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(0) > 1 }}"
+                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(-1) > 1 or state_attr(left_curtain, 'current_position') == none }}"
                 sequence:
                   - service: cover.stop_cover
                     target:
@@ -177,9 +178,10 @@ action:
                     target:
                       entity_id: !input left_curtain_cover
                   - wait_for_trigger:
-                      - platform: state
+                      - platform: numeric_state
                         entity_id: !input left_curtain_cover
-                        to: closed
+                        attribute: current_position
+                        below: 2
                   - service: cover.close_cover
                     target:
                       entity_id: !input left_blinds_cover

@@ -1,10 +1,11 @@
 blueprint:
-  name: 💧 Уведомление о протечке v16.3 (Telegram + Max + VK Фикс)
+  name: 💧 Уведомление о протечке v16.3 (Telegram + Max + VK Фикс + HTML)
   description: >-
     Устранены проблемы с отправкой в телеграмм. Заменен устаревший параметр target на chat_id.
     Добавлена возможность запускать любые дополнительные действия (например, сирену).
     Добавлены PUSH-уведомления о результатах закрытия кранов для всех зон.
     Добавлена поддержка Max Notify (HTML) и VK Notify (Plain text). Исправлено дублирование заголовков.
+    ✨ Включена полноценная поддержка HTML-разметки для Telegram.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/new_waterleackdeteckt_tts_push_notifi.yaml
   
@@ -261,7 +262,7 @@ action:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                               parse_mode: html
                               
                   - if: "{{ max_targets | length > 0 }}"
@@ -308,7 +309,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
+                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне <b>{{ zone }}</b> перекрыты."
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -345,7 +346,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: {{ failed }}"
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -393,7 +394,7 @@ action:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                               parse_mode: html
 
                   - if: "{{ max_targets | length > 0 }}"
@@ -438,7 +439,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
+                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне <b>{{ zone }}</b> перекрыты."
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -474,7 +475,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: {{ failed }}"
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -522,7 +523,7 @@ action:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                               parse_mode: html
                               
                   - if: "{{ max_targets | length > 0 }}"
@@ -567,7 +568,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
+                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне <b>{{ zone }}</b> перекрыты."
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -603,7 +604,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: {{ failed }}"
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -651,7 +652,7 @@ action:
                           - service: telegram_bot.send_message
                             data:
                               chat_id: '{{ target_chat_ids }}'
-                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю краны...{% endif %}"
                               parse_mode: html
                               
                   - if: "{{ max_targets | length > 0 }}"
@@ -696,7 +697,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне {{ zone }} перекрыты."
+                                      message: "<b>✅ УСПЕШНО:</b> Все краны в зоне <b>{{ zone }}</b> перекрыты."
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:
@@ -732,7 +733,7 @@ action:
                                   - service: telegram_bot.send_message
                                     data:
                                       chat_id: '{{ target_chat_ids }}'
-                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: {{ failed }}"
                                       parse_mode: html
                           - if: "{{ max_targets | length > 0 }}"
                             then:

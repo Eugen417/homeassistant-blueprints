@@ -1,0 +1,427 @@
+id: homeassistant_person_tracker_telegram_v1.6
+blueprint:
+  name: "🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.6 (HTML Edition)"
+  description: "Отслеживание прихода/ухода выбранных пользователей (person.XXX) с генерацией
+    интерактивной кнопки для запроса местоположения. **Все уведомления теперь
+    полностью редактируются через настройки автоматизации.**
+    Заменен устаревший параметр target на chat_id для Telegram.
+    
+    ✨ **НОВОЕ:** Добавлена поддержка HTML разметки во все текстовые поля и красивые заголовки сообщений! Вы можете использовать теги <b>жирный</b>, <i>курсив</i> в своих фразах.
+
+    ✅ Поддержка одновременного срабатывания (`mode: parallel`) и запроса местоположения
+    **всех** отслеживаемых пользователей (`/gde_vse`).
+
+    ТРЕБОВАНИЕ: Для Telegram-кнопок необходим `platform: polling` в конфигурации бота.
+
+    ---
+    **ПРИМЕР КОНФИГУРАЦИИ TELEGRAM В configuration.yaml** 🤖
+    ---
+    telegram_bot:
+      - platform: polling 
+        api_key: \"ВАШ_ТОКЕН_БОТА\"
+        parse_mode: html
+        allowed_chat_ids:
+          - -1234567890123 
+          - 987654321 
+        allowed_commands:
+          - /gde_vse 
+    "
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/person_tracker_RU.yaml
+  domain: automation
+  input:
+    tracked_persons:
+      name: "📝 Список отслеживаемых пользователей (person.XXX) 🗺️"
+      description: Выберите person-сущности для отслеживания.
+      selector:
+        entity:
+          domain:
+          - person
+          multiple: true
+          reorder: false
+    telegram_notifications:
+      name: "➤ Сервис уведомлений Telegram (notify.xxx) 🗺️"
+      description: Выберите сущность notify, созданную для Telegram-бота.
+      selector:
+        entity:
+          domain:
+          - notify
+          integration: telegram_bot
+          multiple: false
+          reorder: false
+    message_left_home:
+      name: "🚶 Сообщение об уходе"
+      description: Сообщение, когда пользователь покидает зону 'home' (Поддерживает HTML).
+      default: "<b>{name}</b> вышел из квартиры 🚪"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    message_returned_home:
+      name: "🏡 Сообщение о возвращении"
+      description: Сообщение, когда пользователь возвращается в зону 'home' (Поддерживает HTML).
+      default: "<b>{name}</b> вернулся домой! 👋"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    button_text_where_now:
+      name: "🗺️ Текст кнопки запроса (один чел.)"
+      description: Текст, который отображается на кнопке для запроса местоположения.
+      default: "Где сейчас {name}? 🗺️"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    button_text_show_all:
+      name: "🌐 Текст кнопки запроса (все)"
+      description: Текст, который отображается на кнопке для запроса всех пользователей.
+      default: "Показать всех 🌐"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    message_request_all:
+      name: ✅ Сообщение-заголовок для запроса всех
+      description: Сообщение перед циклом отправки местоположения всех пользователей (Поддерживает HTML).
+      default: 'Запрос местоположения всех отслеживаемых пользователей (<b>{count} чел.</b>) от <i>{sender}</i>:'
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    message_location_unknown:
+      name: ❓ Сообщение о неизвестном местоположении
+      description: Сообщение, если координаты пользователя отсутствуют (Поддерживает HTML).
+      default: ⚠️ Местоположение <b>{name}</b> сейчас неизвестно. ❓
+      selector:
+        text:
+          multiline: false
+          multiple: false
+    message_home_status:
+      name: "🏠 Фраза для статуса \"дома\""
+      description: Фраза, используемая в ответе на запрос, если пользователь находится 'home' (Поддерживает HTML).
+      default: "дома! 🏡"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+trigger:
+- platform: state
+  entity_id: !input tracked_persons
+  to: not_home
+- platform: state
+  entity_id: !input tracked_persons
+  to: home
+- id: location_request
+  platform: event
+  event_type: telegram_callback
+- id: command_request
+  platform: event
+  event_type: telegram_command
+action:
+- variables:
+    telegram_notifications_id: !input telegram_notifications
+    tracked_persons_ids: !input tracked_persons
+    all_command: /gde_vse
+    notify_target_id: "{% set entity_id = telegram_notifications_id | default('')
+      %} {% set chat_id_part = entity_id | regex_replace(find='^.+_', replace='')
+      | string | trim %} {% set final_id = chat_id_part %} {% if final_id | length
+      > 10 and not final_id.startswith('-') %}
+  {% set final_id = '-' ~ final_id
+      %}
+{% endif %} {{ [final_id] }}"
+    phrase_left_home: !input message_left_home
+    phrase_returned_home: !input message_returned_home
+    phrase_button_where: !input button_text_where_now
+    phrase_button_all: !input button_text_show_all
+    phrase_request_all: !input message_request_all
+    phrase_unknown: !input message_location_unknown
+    phrase_home_status: !input message_home_status
+    sender_name: "{% if trigger.platform == 'event' and trigger.event is defined %}
+      {% set data = trigger.event.data | default({}) %}
+  {% if trigger.id == 'command_request'
+      %}
+    {% set user_data = data.user_data | default({}) %}
+    {% set first
+      = data.from_first | default(user_data.first_name) | default('') %}
+    {% set
+      last = user_data.last_name | default('') %}
+    {% set username = user_data.username
+      | default('') %}
+    {% set user_id = user_data.id | default('') %}
+    
+      {% if first | length > 0 %}
+      {% if last | length > 0 %}
+        {{
+      first }} {{ last }}
+      {% else %}
+        {{ first }}
+      {% endif %}
+      {% elif username | length > 0 %}
+      @{{ username }}
+    {% elif user_id
+      | string | length > 0 %}
+      [ID: {{ user_id }}]
+    {% else %}
+      Неизвестный
+      пользователь
+    {% endif %}
+  {% elif trigger.id == 'location_request' %}
+      {% set first_name = data.from_first | default('') %}
+    {% set user_id
+      = data.user_id | default('') %}
+    {% if first_name | length > 0 %}
+      {{
+      first_name }}
+    {% elif user_id | string | length > 0 %}
+      [ID: {{ user_id
+      }}]
+    {% else %}
+      Неизвестный пользователь
+    {% endif %}
+  {% else
+      %}
+    ''
+  {% endif %}
+{% else %}
+  ''
+{% endif %}"
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.platform == ''state'' and trigger.to_state.state
+        == ''not_home'' }}'
+    sequence:
+    - variables:
+        triggered_person_id: '{{ trigger.entity_id }}'
+        triggered_person_name: '{{ state_attr(trigger.entity_id, ''friendly_name'')
+          | default(trigger.entity_id.split(''.'')[1]) }}'
+        button_command: /где_{{ trigger.entity_id.split('.')[1] }}
+    - service: telegram_bot.send_message
+      data:
+        title: "🚪 Изменение статуса"
+        message: '{{ phrase_left_home | replace(''{name}'', triggered_person_name) }}'
+        chat_id: '{{ notify_target_id }}'
+        parse_mode: html
+        inline_keyboard:
+        - '{{ phrase_button_where | replace(''{name}'', triggered_person_name) }}:{{
+          button_command }}'
+        - '{{ phrase_button_all }}:{{ all_command }}'
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.platform == ''state'' and trigger.to_state.state
+        == ''home'' }}'
+    sequence:
+    - variables:
+        triggered_person_name: '{{ state_attr(trigger.entity_id, ''friendly_name'')
+          | default(trigger.entity_id.split(''.'')[1]) }}'
+    - service: telegram_bot.send_message
+      data:
+        title: "🏠 Изменение статуса"
+        message: '{{ phrase_returned_home | replace(''{name}'', triggered_person_name) }}'
+        chat_id: '{{ notify_target_id }}'
+        parse_mode: html
+  - conditions:
+    - condition: trigger
+      id: location_request
+    - condition: template
+      value_template: '{% set full_id = trigger.event.data.command | regex_replace(find=''/где_'',
+        replace='''') %} {{ trigger.event.data.command.startswith(''/где_'') and ''person.''
+        + full_id in tracked_persons_ids }}'
+    sequence:
+    - variables:
+        target_name_id: '{{ trigger.event.data.command | regex_replace(find=''/где_'',
+          replace='''') }}'
+        target_person_id: person.{{ target_name_id }}
+        target_person_name: '{{ state_attr(target_person_id, ''friendly_name'') |
+          default(target_person_id.split(''.'')[1]) }}'
+        chat_id_response: '{{ trigger.event.data.chat_id | int }}'
+    - service: telegram_bot.answer_callback_query
+      data:
+        callback_query_id: '{{ trigger.event.data.id }}'
+        message: Запрос от {{ sender_name }}. Ищу {{ target_person_name }}... ⏳
+        show_alert: false
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ state_attr(target_person_id, ''latitude'') is not none
+            }}'
+        sequence:
+        - variables:
+            status_message: "{% set current_state = states(target_person_id) %}
+{%
+              set person_name = target_person_name %}
+
+{% if current_state == 'home'
+              %}
+  <b>{{ person_name }}</b> {{ phrase_home_status }}
+{% elif current_state
+              != 'not_home' %}
+  Местонахождение <b>{{ person_name }}</b>: <code>{{ current_state
+              }}</code> 📍
+{% else %}
+  <b>{{ person_name }}</b> не дома! 🗺️
+{%
+              endif %}
+
+<i>Запрошено: {{ sender_name }}</i>"
+        - service: telegram_bot.send_message
+          data:
+            title: "📡 Информация о местоположении"
+            chat_id: '{{ chat_id_response }}'
+            message: '{{ status_message }}'
+            parse_mode: html
+        - service: telegram_bot.send_location
+          data:
+            chat_id: '{{ chat_id_response }}'
+            latitude: '{{ state_attr(target_person_id, ''latitude'') }}'
+            longitude: '{{ state_attr(target_person_id, ''longitude'') }}'
+      - conditions:
+        - condition: template
+          value_template: '{{ state_attr(target_person_id, ''latitude'') is none }}'
+        sequence:
+        - service: telegram_bot.send_message
+          data:
+            title: "❓ Местоположение неизвестно"
+            chat_id: '{{ chat_id_response }}'
+            message: '<i>{{ phrase_unknown | replace(''{name}'', target_person_name) }}</i>'
+            parse_mode: html
+  - conditions:
+    - condition: trigger
+      id: location_request
+    - condition: template
+      value_template: '{{ trigger.event.data.command == all_command }}'
+    sequence:
+    - variables:
+        chat_id_response: '{{ trigger.event.data.chat_id | int }}'
+    - service: telegram_bot.answer_callback_query
+      data:
+        callback_query_id: '{{ trigger.event.data.id }}'
+        message: "Запрос местоположения всех пользователей от {{ sender_name }}. Начинаю
+          отправку... 🗺️"
+        show_alert: false
+    - service: telegram_bot.send_message
+      data:
+        title: "🌐 Глобальный запрос"
+        chat_id: '{{ chat_id_response }}'
+        message: '<b>{{ phrase_request_all | replace(''{count}'', (tracked_persons_ids
+          | count)) | replace(''{sender}'', sender_name) }}</b>'
+        parse_mode: html
+    - repeat:
+        for_each: '{{ tracked_persons_ids }}'
+        sequence:
+        - variables:
+            target_person_id: '{{ repeat.item }}'
+            target_person_name: '{{ state_attr(repeat.item, ''friendly_name'') | default(repeat.item.split(''.'')[1])
+              }}'
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: '{{ state_attr(target_person_id, ''latitude'') is not
+                none }}'
+            sequence:
+            - variables:
+                status_message: "{% set current_state = states(target_person_id) %}
+{%
+                  set person_name = target_person_name %}
+
+{% if current_state ==
+                  'home' %}
+  <b>{{ person_name }}</b> {{ phrase_home_status }}
+{% elif
+                  current_state != 'not_home' %}
+  Местонахождение <b>{{ person_name
+                  }}</b>: <code>{{ current_state }}</code> 📍
+{% else %}
+  <b>{{ person_name
+                  }}</b> не дома! 🗺️
+{% endif %}"
+            - service: telegram_bot.send_message
+              data:
+                title: "📍 Локация: {{ target_person_name }}"
+                chat_id: '{{ chat_id_response }}'
+                message: '{{ status_message }}'
+                parse_mode: html
+            - service: telegram_bot.send_location
+              data:
+                chat_id: '{{ chat_id_response }}'
+                latitude: '{{ state_attr(target_person_id, ''latitude'') }}'
+                longitude: '{{ state_attr(target_person_id, ''longitude'') }}'
+          - conditions:
+            - condition: template
+              value_template: '{{ state_attr(target_person_id, ''latitude'') is none
+                }}'
+            sequence:
+            - service: telegram_bot.send_message
+              data:
+                title: "❓ Внимание"
+                chat_id: '{{ chat_id_response }}'
+                message: '<i>{{ phrase_unknown | replace(''{name}'', target_person_name) }}</i>'
+                parse_mode: html
+  - conditions:
+    - condition: trigger
+      id: command_request
+    - condition: template
+      value_template: '{{ trigger.event.data.command | trim == all_command }}'
+    sequence:
+    - variables:
+        chat_id_response: '{{ trigger.event.data.chat_id | int }}'
+    - service: telegram_bot.send_message
+      data:
+        title: "🌐 Глобальный запрос"
+        chat_id: '{{ chat_id_response }}'
+        message: '<b>{{ phrase_request_all | replace(''{count}'', (tracked_persons_ids
+          | count)) | replace(''{sender}'', sender_name) }}</b>'
+        parse_mode: html
+    - repeat:
+        for_each: '{{ tracked_persons_ids }}'
+        sequence:
+        - variables:
+            target_person_id: '{{ repeat.item }}'
+            target_person_name: '{{ state_attr(repeat.item, ''friendly_name'') | default(repeat.item.split(''.'')[1])
+              }}'
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: '{{ state_attr(target_person_id, ''latitude'') is not
+                none }}'
+            sequence:
+            - variables:
+                status_message: "{% set current_state = states(target_person_id) %}
+{%
+                  set person_name = target_person_name %}
+
+{% if current_state ==
+                  'home' %}
+  <b>{{ person_name }}</b> {{ phrase_home_status }}
+{% elif
+                  current_state != 'not_home' %}
+  Местонахождение <b>{{ person_name
+                  }}</b>: <code>{{ current_state }}</code> 📍
+{% else %}
+  <b>{{ person_name
+                  }}</b> не дома! 🗺️
+{% endif %}"
+            - service: telegram_bot.send_message
+              data:
+                title: "📍 Локация: {{ target_person_name }}"
+                chat_id: '{{ chat_id_response }}'
+                message: '{{ status_message }}'
+                parse_mode: html
+            - service: telegram_bot.send_location
+              data:
+                chat_id: '{{ chat_id_response }}'
+                latitude: '{{ state_attr(target_person_id, ''latitude'') }}'
+                longitude: '{{ state_attr(target_person_id, ''longitude'') }}'
+          - conditions:
+            - condition: template
+              value_template: '{{ state_attr(target_person_id, ''latitude'') is none
+                }}'
+            sequence:
+            - service: telegram_bot.send_message
+              data:
+                title: "❓ Внимание"
+                chat_id: '{{ chat_id_response }}'
+                message: '<i>{{ phrase_unknown | replace(''{name}'', target_person_name) }}</i>'
+                parse_mode: html
+mode: parallel
+max: 10

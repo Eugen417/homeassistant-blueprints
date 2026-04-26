@@ -1,6 +1,10 @@
 blueprint:
-  name: 📊 Периодический Отчет (ВСЕ классы) v1.1
-  description: Создает отчет по ВСЕМ датчикам выбранного класса, используя максимально совместимую и очищенную логику Jinja. Включены все стандартные классы сенсоров. Заменен устаревший параметр target на chat_id.
+  name: 📊 Периодический Отчет (ВСЕ классы) v1.2 (Telegram + Max + VK Notify (Keyboard Edition))
+  description: >-
+    Создает отчет по ВСЕМ датчикам выбранного класса. 
+    Исправлена ошибка JSON-парсера (from_json) при обработке переносов строк.
+    Включены все стандартные классы сенсоров. 
+    Добавлена поддержка Max Notify и VK Notify с полноценным HTML и заголовками.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 
@@ -106,10 +110,118 @@ blueprint:
           entity:
             - domain: notify
 
+    vk_notify_target:
+      name: 💬 VK Notify
+      description: Выберите сущности VK Notify. Отправка будет с HTML-разметкой.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    max_notify_target:
+      name: 💬 Max Notify
+      description: Выберите сущности Max Notify. Отправка в формате HTML.
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
 variables:
   target_class: !input target_device_class
   exclude_input: !input exclude_sensors
   telegram_target_input: !input telegram_notify_target
+  vk_input: !input vk_notify_target
+  max_input: !input max_notify_target
+
+  target_chat_ids: >
+    {% set selected_entities_raw = telegram_target_input.entity_id | default([]) %}
+    {% set selected_entities = [selected_entities_raw] | flatten %}
+    {% set entity_ids_only = selected_entities | map('regex_replace', find='^notify\..+_', replace='') | list %}
+    {% set ns = namespace(target_ids=[]) %}
+    {% for id_string in entity_ids_only %}
+      {% set cleaned_id = id_string | string | trim %}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set id_with_hyphen = '-' ~ cleaned_id %}
+        {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.target_ids }}
+    
+  vk_targets: >-
+    {% set raw = vk_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+    
+  max_targets: >-
+    {% set raw = max_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+
+  report_title: >-
+    {% set class_labels = {
+      'aqi': 'Индекс качества воздуха (AQI)',
+      'apparent_power': 'Полная мощность',
+      'battery': 'Заряд батареи',
+      'carbon_dioxide': 'Углекислый газ',
+      'carbon_monoxide': 'Угарный газ',
+      'current': 'Ток',
+      'data_rate': 'Скорость передачи данных',
+      'data_size': 'Объем данных',
+      'distance': 'Расстояние',
+      'duration': 'Продолжительность',
+      'energy': 'Энергия',
+      'frequency': 'Частота',
+      'gas': 'Газ',
+      'humidity': 'Влажность',
+      'illuminance': 'Освещенность',
+      'monetary': 'Финансы/Валюта',
+      'pm1': 'Твердые частицы PM1',
+      'pm25': 'Твердые частицы PM2.5',
+      'pm10': 'Твердые частицы PM10',
+      'power': 'Мощность',
+      'power_factor': 'Коэффициент мощности',
+      'pressure': 'Давление',
+      'reactive_power': 'Реактивная мощность',
+      'signal_strength': 'Сила сигнала',
+      'speed': 'Скорость',
+      'temperature': 'Температура',
+      'volatile_organic_compounds': 'ЛОС',
+      'voltage': 'Напряжение',
+      'volume': 'Объем',
+      'water': 'Вода',
+      'weight': 'Вес',
+      'wind_speed': 'Скорость ветра'
+    } %}
+    {{ class_labels[target_class] | default(target_class) }}
+
+  report_body: >-
+    {% set excluded_ids = exclude_input.entity_id | default([]) | flatten %}
+    {% set report_lines = namespace(output=[]) %}
+    {%- for sensor in states.sensor
+          | selectattr('attributes.device_class', 'eq', target_class)
+          | sort(attribute='name') -%}
+      {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
+      {%- if sensor_is_excluded == false -%}
+          {%- set name = sensor.name -%}
+          {%- set state = sensor.state -%}
+          {%- if state in ['unknown', 'unavailable', 'none', ''] -%}
+              {%- set formatted_value = "<b>(" ~ state ~ ")</b>" -%}
+          {%- else -%}
+              {%- set unit = sensor.attributes.unit_of_measurement | default('') -%}
+              {%- set formatted_value = state | round(2) ~ " " ~ unit -%}
+          {%- endif -%}
+          {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ formatted_value ] -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if report_lines.output | length > 0 -%}
+      {{ report_lines.output | join('\n') }}
+    {%- else -%}
+      (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их наличие.)
+    {%- endif -%}
           
 mode: single
 
@@ -118,97 +230,32 @@ trigger:
     minutes: !input report_interval_pattern
 
 action:
-  - service: telegram_bot.send_message
-    data:
-      
-      # 1. ЛОГИКА CHAT_ID
-      chat_id: >-
-        {% set target_input = telegram_target_input | default({}) %}
-        {% set selected_entities_raw = target_input.entity_id | default([]) %}
-        {% set selected_entities = [selected_entities_raw] | flatten %}
-        {% set entity_ids_only = selected_entities | map('regex_replace', find='^notify\..+_', replace='') | list %}
-        {% set ns = namespace(target_ids=[]) %}
-        {% for id_string in entity_ids_only %}
-          {% set cleaned_id = id_string | string | trim %}
-          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
-            {% set id_with_hyphen = '-' ~ cleaned_id %}
-            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
-          {% else %}
-            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
-          {% endif %}
-        {% endfor %}
-        {{ ns.target_ids }}
-        
-      # 2. ТЕЛО СООБЩЕНИЯ (Модифицировано для включения и выделения недоступных статусов)
-      message: |
-        {% set class_labels = {
-          'aqi': 'Индекс качества воздуха (AQI)',
-          'apparent_power': 'Полная мощность',
-          'battery': 'Заряд батареи',
-          'carbon_dioxide': 'Углекислый газ',
-          'carbon_monoxide': 'Угарный газ',
-          'current': 'Ток',
-          'data_rate': 'Скорость передачи данных',
-          'data_size': 'Объем данных',
-          'distance': 'Расстояние',
-          'duration': 'Продолжительность',
-          'energy': 'Энергия',
-          'frequency': 'Частота',
-          'gas': 'Газ',
-          'humidity': 'Влажность',
-          'illuminance': 'Освещенность',
-          'monetary': 'Финансы/Валюта',
-          'pm1': 'Твердые частицы PM1',
-          'pm25': 'Твердые частицы PM2.5',
-          'pm10': 'Твердые частицы PM10',
-          'power': 'Мощность',
-          'power_factor': 'Коэффициент мощности',
-          'pressure': 'Давление',
-          'reactive_power': 'Реактивная мощность',
-          'signal_strength': 'Сила сигнала',
-          'speed': 'Скорость',
-          'temperature': 'Температура',
-          'volatile_organic_compounds': 'ЛОС',
-          'voltage': 'Напряжение',
-          'volume': 'Объем',
-          'water': 'Вода',
-          'weight': 'Вес',
-          'wind_speed': 'Скорость ветра'
-        } %}
-        {% set report_title = class_labels[target_class] | default(target_class) %}
-        
-        📊 <b>Периодический Отчет по {{ report_title }}</b>
-        
-        Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }})
-        {% set excluded_ids = exclude_input.entity_id | default([]) | flatten %}
-        {% set report_lines = namespace(output=[]) %}
-        {%- for sensor in states.sensor
-              | selectattr('attributes.device_class', 'eq', target_class)
-              | sort(attribute='name') -%}
-          {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
-          {%- if sensor_is_excluded == false -%}
-              {%- set name = sensor.name -%}
-              {%- set state = sensor.state -%}
-              {%- if state in ['unknown', 'unavailable', 'none', ''] -%}
-                  {# Выделение статуса <b>жирным</b> шрифтом #}
-                  {%- set formatted_value = "<b>(" ~ state ~ ")</b>" -%}
-              {%- else -%}
-                  {# Если состояние числовое, округляем и добавляем единицу измерения #}
-                  {%- set unit = sensor.attributes.unit_of_measurement | default('N/A') -%}
-                  {%- set formatted_value = state | round(2) ~ " " ~ unit -%}
-              {%- endif -%}
-              {%- set report_lines.output = report_lines.output + [ name ~ ": " ~ formatted_value ] -%}
-          {%- endif -%}
-        {%- endfor -%}
-        
-        {%- if report_lines.output | length > 0 -%}
-        
-        {{ report_lines.output | join('\n') }}
-        
-        {%- else -%}
-        
-        (Не удалось найти активные датчики с классом {{ report_title }}. Проверьте их наличие.)
-        
-        {%- endif -%}
-        
-      parse_mode: html
+  - choose:
+      - conditions: "{{ target_chat_ids | length > 0 }}"
+        sequence:
+          - action: telegram_bot.send_message
+            data:
+              chat_id: '{{ target_chat_ids }}'
+              message: "📊 <b>Периодический Отчет по {{ report_title }}</b>\n\nТекущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+              parse_mode: html
+
+  - if: "{{ max_targets | length > 0 }}"
+    then:
+      - action: max_notify.send_message
+        target:
+          entity_id: "{{ max_targets }}"
+        data:
+          title: "📊 <b>Периодический Отчет по {{ report_title }}</b>"
+          message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+          format: html
+
+  - if: "{{ vk_targets | length > 0 }}"
+    then:
+      - action: vk_notify.send_message
+        target:
+          entity_id: "{{ vk_targets }}"
+        data:
+          title: "📊 <b>Периодический Отчет по {{ report_title }}</b>"
+          message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+          parse_mode: html
+          disable_mentions: true

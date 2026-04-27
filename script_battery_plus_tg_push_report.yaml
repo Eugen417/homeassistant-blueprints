@@ -1,9 +1,10 @@
 blueprint:
-  name: "🔋 Скрипт отчета по батареям (v1.0.5)"
-  description: 'Версия скрипта для отчета о состоянии батарей.
-    Добавлена поддержка Telegram (HTML), Max Notify (HTML) и VK (Plain Text с переносами).
-    Возвращены блоки сводки по типам и офлайн-устройств.
-    Требование: Интеграция HA-Battery Notes.'
+  name: "🔋 Скрипт отчета по батареям v1.0.6 (Parallel HTML Edition)"
+  description: >
+    Версия скрипта для отчета о состоянии батарей.
+    Добавлена поддержка нативных служб Telegram, Max Notify и VK Notify (Keyboard Edition) с полноценным HTML и заголовками.
+    ✨ НОВОЕ: Все сообщения отправляются параллельно. Ошибка таймаута в одном мессенджере больше не блокирует остальные.
+    Требование: Интеграция HA-Battery Notes.
   domain: script
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/script_battery_plus_tg_push_report.yaml
   input:
@@ -27,7 +28,7 @@ blueprint:
                 - notify
     vk_notify_target:
       name: "💬 VK Notify"
-      description: "Выберите сущности VK Notify. Отправка будет без HTML-тегов."
+      description: "Выберите сущности VK Notify. Отправка будет с поддержкой HTML."
       default:
         entity_id: []
       selector:
@@ -200,9 +201,26 @@ variables:
   title_short_charge_ok: !input title_short_charge_ok
   title_full_report: !input title_full_report
 
+  # --- Target IDs ---
+  target_chat_ids: >-
+    {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+    {% set selected_entities = [selected_entities_raw] | flatten %}
+    {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+    {% set ns = namespace(target_ids=[]) %}
+    {% for id_string in chat_id_strings %}
+      {% set cleaned_id = id_string | string | trim %}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set ns.target_ids = ns.target_ids + ['-' ~ cleaned_id] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.target_ids }}
+
   vk_targets: >-
     {% set raw = vk_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
+    
   max_targets: >-
     {% set raw = max_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
@@ -212,99 +230,241 @@ sequence:
     variables:
       threshold: '{{ critical_threshold | int }}'
       exclude_list: '{{ excluded_entity_ids.entity_id | default([]) }}'
-      disposable_message: "{% set ns = namespace(disposable_lines=[]) %} {% for sensor in states.sensor %} {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %} {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %} {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %} {% if numerical_level >= 0 and numerical_level < threshold %} {% set battery_type = sensor.attributes.battery_type | default('Unknown') %} {% set cleaned_name = name | replace(' Батарея+', '') | trim %} {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %} {% if not is_rechargeable %} {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %} {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %} {% set line_action = text_disposable_action | replace('%LEVEL%', numerical_level | string) | replace('%TYPE%', escaped_battery_type) | replace('%QTY%', escaped_quantity) %} {% set line = escaped_name ~ \": \" ~ line_action %} {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %} {% endif %} {% endif %} {% endif %} {% endfor %} {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %} {% set disposable_output = sorted_disposable | map(attribute='line') | list %} {% if disposable_output | length > 0 %} {{ text_disposable_header ~ '\\n' ~ disposable_output | join('\\n') }} {% else %} {{ text_disposable_ok ~ critical_threshold ~ \"%.\" }} {% endif %}"
-      rechargeable_message: "{% set ns = namespace(rechargeable_lines=[]) %} {% for sensor in states.sensor %} {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %} {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %} {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %} {% if numerical_level >= 0 and numerical_level < threshold %} {% set battery_type = sensor.attributes.battery_type | default('Unknown') %} {% set cleaned_name = name | replace(' Батарея+', '') | trim %} {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %} {% if is_rechargeable %} {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set line_action = text_rechargeable_action | replace('%LEVEL%', numerical_level | string) %} {% set line = escaped_name ~ \": \" ~ line_action %} {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %} {% endif %} {% endif %} {% endif %} {% endfor %} {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %} {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %} {% if rechargeable_output | length > 0 %} {{ text_rechargeable_header ~ '\\n' ~ rechargeable_output | join('\\n') }} {% else %} {{ text_rechargeable_ok ~ critical_threshold ~ \"%.\" }} {% endif %}"
-      full_report_body_list: "{% set ns = namespace(all_lines=[]) %} {% set yellow_boundary = 40 %} {% set red_boundary = 15 %} {% for sensor in states.sensor %} {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %} {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %} {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %} {% if numerical_level >= 0 %} {% set battery_type = sensor.attributes.battery_type | default('Unknown') %} {% set cleaned_name = name | replace(' Батарея+', '') | trim %} {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %} {% set status_icon = '🟢' %} {% if numerical_level < red_boundary %} {% set status_icon = '🔴' %} {% elif numerical_level < yellow_boundary %} {% set status_icon = '🟡' %} {% endif %} {% set status_label = '' %} {% if numerical_level < threshold %} {% set status_label = text_full_replace_label if not is_rechargeable else text_full_charge_label %} {% endif %} {% set details = \"\" %} {% if not is_rechargeable %} {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %} {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %} {% set details = \" (Тип: \" ~ escaped_battery_type ~ \", Кол-во: \" ~ escaped_quantity ~ \" шт)\" %} {% endif %} {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set line = status_icon ~ \" \" ~ escaped_name ~ \": \" ~ numerical_level ~ \"%\" ~ status_label ~ details %} {% set ns.all_lines = ns.all_lines + [{ 'level': numerical_level, 'line': line }] %} {% endif %} {% endif %} {% endfor %} {% set sorted_all = ns.all_lines | sort(attribute='level', reverse=true) %} {% set all_output = sorted_all | map(attribute='line') | list %} {% if all_output | length > 0 %} {{ all_output | join('\\n') }} {% else %} {{ text_no_sensors }} {% endif %}"
-      battery_types_summary: "{% set ns = namespace(output_lines=[]) %} {% set all_battery_sensors = states.sensor | selectattr('attributes.battery_last_reported_level', 'defined') | rejectattr('entity_id', 'in', exclude_list) | list %} {% set grouped_by_type = all_battery_sensors | groupby('attributes.battery_type') %} {% for type, sensors in grouped_by_type %} {% set total_quantity = namespace(value=0) %} {% for sensor in sensors %} {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %} {% set total_quantity.value = total_quantity.value + quantity %} {% endfor %} {% set display_type = type | default(text_unknown_type) | string %} {% if display_type == 'Rechargeable' %} {% set display_type = text_rechargeable_type %} {% endif %} {% set escaped_display_type = display_type | replace('<', '&lt;') | replace('>', '&gt;') %} {% set line = \"• \" ~ escaped_display_type ~ \" (Всего: \" ~ total_quantity.value ~ \" шт)\" %} {% set ns.output_lines = ns.output_lines + [line] %} {% endfor %} {% if ns.output_lines | length > 0 %} {{ text_summary_header ~ ns.output_lines | sort | join('\\n') }} {% else %} {{ text_no_summary_data }} {% endif %}"
-      offline_sensors_report: "{% set ns = namespace(offline_lines=[]) %} {% for sensor in states.sensor %} {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %} {% if sensor.state in ['unavailable', 'unknown'] %} {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %} {% set cleaned_name = name | replace(' Батарея+', '') | trim %} {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %} {% set line = \"❓ \" ~ escaped_name ~ \" (Статус: \" ~ sensor.state ~ \")\" %} {% set ns.offline_lines = ns.offline_lines + [line] %} {% endif %} {% endif %} {% endfor %} {% if ns.offline_lines | length > 0 %} {{ text_offline_header ~ '\\n' ~ ns.offline_lines | join('\\n') }} {% endif %}"
-      grand_total_quantity: "{% set total = namespace(value=0) %} {% for sensor in states.sensor %} {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %} {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %} {% set total.value = total.value + quantity %} {% endif %} {% endfor %} {{ total.value }}"
-      full_report_message: "{% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %} {% set header = title_full_report %} {{ header ~ '\\n' ~ total_text ~ '\\n\\n' ~ full_report_body_list ~ '\\n\\n' ~ battery_types_summary ~ '\\n\\n' ~ offline_sensors_report }}"
+      
+      disposable_message: >-
+        {% set ns = namespace(disposable_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            {% if numerical_level >= 0 and numerical_level < threshold %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {% if not is_rechargeable %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
+                {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set line_action = text_disposable_action | replace('%LEVEL%', numerical_level | string) | replace('%TYPE%', escaped_battery_type) | replace('%QTY%', escaped_quantity) %}
+                {% set line = escaped_name ~ ": " ~ line_action %}
+                {% set ns.disposable_lines = ns.disposable_lines + [{ 'level': numerical_level, 'line': line }] %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_disposable = ns.disposable_lines | sort(attribute='level') %}
+        {% set disposable_output = sorted_disposable | map(attribute='line') | list %}
+        {% if disposable_output | length > 0 %}
+          {{ text_disposable_header ~ '\n' ~ disposable_output | join('\n') }}
+        {% else %}
+          {{ text_disposable_ok ~ critical_threshold ~ "%." }}
+        {% endif %}
+        
+      rechargeable_message: >-
+        {% set ns = namespace(rechargeable_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            {% if numerical_level >= 0 and numerical_level < threshold %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {% if is_rechargeable %}
+                {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set line_action = text_rechargeable_action | replace('%LEVEL%', numerical_level | string) %}
+                {% set line = escaped_name ~ ": " ~ line_action %}
+                {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_rechargeable = ns.rechargeable_lines | sort(attribute='level') %}
+        {% set rechargeable_output = sorted_rechargeable | map(attribute='line') | list %}
+        {% if rechargeable_output | length > 0 %}
+          {{ text_rechargeable_header ~ '\n' ~ rechargeable_output | join('\n') }}
+        {% else %}
+          {{ text_rechargeable_ok ~ critical_threshold ~ "%." }}
+        {% endif %}
+        
+      full_report_body_list: >-
+        {% set ns = namespace(all_lines=[]) %}
+        {% set yellow_boundary = 40 %}
+        {% set red_boundary = 15 %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+            {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
+            {% if numerical_level >= 0 %}
+              {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
+              {% set status_icon = '🟢' %}
+              {% if numerical_level < red_boundary %}
+                {% set status_icon = '🔴' %}
+              {% elif numerical_level < yellow_boundary %}
+                {% set status_icon = '🟡' %}
+              {% endif %}
+              {% set status_label = '' %}
+              {% if numerical_level < threshold %}
+                {% set status_label = text_full_replace_label if not is_rechargeable else text_full_charge_label %}
+              {% endif %}
+              {% set details = "" %}
+              {% if not is_rechargeable %}
+                {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
+                {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
+                {% set details = " (Тип: " ~ escaped_battery_type ~ ", Кол-во: " ~ escaped_quantity ~ " шт)" %}
+              {% endif %}
+              {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+              {% set line = status_icon ~ " " ~ escaped_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
+              {% set ns.all_lines = ns.all_lines + [{ 'level': numerical_level, 'line': line }] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_all = ns.all_lines | sort(attribute='level', reverse=true) %}
+        {% set all_output = sorted_all | map(attribute='line') | list %}
+        {% if all_output | length > 0 %}
+          {{ all_output | join('\n') }}
+        {% else %}
+          {{ text_no_sensors }}
+        {% endif %}
+        
+      battery_types_summary: >-
+        {% set ns = namespace(output_lines=[]) %}
+        {% set all_battery_sensors = states.sensor | selectattr('attributes.battery_last_reported_level', 'defined') | rejectattr('entity_id', 'in', exclude_list) | list %}
+        {% set grouped_by_type = all_battery_sensors | groupby('attributes.battery_type') %}
+        {% for type, sensors in grouped_by_type %}
+          {% set total_quantity = namespace(value=0) %}
+          {% for sensor in sensors %}
+            {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %}
+            {% set total_quantity.value = total_quantity.value + quantity %}
+          {% endfor %}
+          {% set display_type = type | default(text_unknown_type) | string %}
+          {% if display_type == 'Rechargeable' %}
+            {% set display_type = text_rechargeable_type %}
+          {% endif %}
+          {% set escaped_display_type = display_type | replace('<', '&lt;') | replace('>', '&gt;') %}
+          {% set line = "• " ~ escaped_display_type ~ " (Всего: " ~ total_quantity.value ~ " шт)" %}
+          {% set ns.output_lines = ns.output_lines + [line] %}
+        {% endfor %}
+        {% if ns.output_lines | length > 0 %}
+          {{ text_summary_header ~ ns.output_lines | sort | join('\n') }}
+        {% else %}
+          {{ text_no_summary_data }}
+        {% endif %}
+        
+      offline_sensors_report: >-
+        {% set ns = namespace(offline_lines=[]) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% if sensor.state in ['unavailable', 'unknown'] %}
+              {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
+              {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
+              {% set line = "❓ " ~ escaped_name ~ " (Статус: " ~ sensor.state ~ ")" %}
+              {% set ns.offline_lines = ns.offline_lines + [line] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% if ns.offline_lines | length > 0 %}
+          {{ text_offline_header ~ '\n' ~ ns.offline_lines | join('\n') }}
+        {% endif %}
+        
+      grand_total_quantity: >-
+        {% set total = namespace(value=0) %}
+        {% for sensor in states.sensor %}
+          {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
+            {% set quantity = sensor.attributes.battery_quantity | default('1') | int(default=1) %}
+            {% set total.value = total.value + quantity %}
+          {% endif %}
+        {% endfor %}
+        {{ total.value }}
+        
+      full_report_message: >-
+        {% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %}
+        {% set header = title_full_report %}
+        {{ header ~ '\n' ~ total_text ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary ~ '\n\n' ~ offline_sensors_report }}
 
-  # --- 1. Отправка на мобильное устройство ---
-  - alias: Send Mobile Notification
-    choose:
-      - conditions:
-          - condition: template
-            value_template: '{{ mobile_device_id is not none and mobile_device_id != "" }}'
-        sequence:
-          - service: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
+  - parallel:
+      # --- 1. Отправка на мобильное устройство ---
+      - if: '{{ mobile_device_id is not none and mobile_device_id != "" }}'
+        then:
+          - action: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
             data:
-              title: "{% if disposable_message.startswith('⚠️') or rechargeable_message.startswith('⚠️') %} {{ title_short_replace_low ~ critical_threshold ~ '%' }} {% else %} {{ title_short_replace_ok }} {% endif %}"
+              title: "{% if disposable_message.startswith('⚠️') or rechargeable_message.startswith('⚠️') %} {{ title_short_replace_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ '%' }} {% else %} {{ title_short_replace_ok | replace('<b>', '') | replace('</b>', '') }} {% endif %}"
               message: "{{ (disposable_message ~ '\n\n' ~ rechargeable_message) | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+            continue_on_error: true
 
-  # --- 2. Отправка в Telegram (Разделено на вычисление переменных и саму отправку) ---
-  - alias: Prepare Telegram Target IDs
-    variables:
-      target_chat_ids: "{% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %} {% set selected_entities = [selected_entities_raw] | flatten %} {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %} {% set ns = namespace(target_ids=[]) %} {% for id_string in chat_id_strings %} {% set cleaned_id = id_string | string | trim %} {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %} {% set ns.target_ids = ns.target_ids + ['-' ~ cleaned_id] %} {% else %} {% set ns.target_ids = ns.target_ids + [cleaned_id] %} {% endif %} {% endfor %} {{ ns.target_ids }}"
-
-  - alias: Send Telegram Notifications
-    choose:
-      - conditions:
-          - condition: template
-            value_template: '{{ target_chat_ids | length > 0 }}'
-        sequence:
-          - service: telegram_bot.send_message
+      # --- 2. Отправка в Telegram ---
+      - if: '{{ target_chat_ids | length > 0 }}'
+        then:
+          - action: telegram_bot.send_message
             data:
               chat_id: '{{ target_chat_ids }}'
-              message: "{% set header = '<b>' ~ (title_short_replace_low if disposable_message.startswith('⚠️') else title_short_replace_ok) ~ (critical_threshold ~ '%' if disposable_message.startswith('⚠️') else '') ~ '</b>' %} {{ header ~ '\\n\\n' ~ disposable_message }}"
+              message: "{% set header = '<b>' ~ (title_short_replace_low if disposable_message.startswith('⚠️') else title_short_replace_ok) ~ (critical_threshold ~ '%' if disposable_message.startswith('⚠️') else '') ~ '</b>' %} {{ header ~ '\n\n' ~ disposable_message }}"
               parse_mode: html
-          - service: telegram_bot.send_message
+            continue_on_error: true
+          - action: telegram_bot.send_message
             data:
               chat_id: '{{ target_chat_ids }}'
-              message: "{% set header = '<b>' ~ (title_short_charge_low if rechargeable_message.startswith('⚠️') else title_short_charge_ok) ~ (critical_threshold ~ '%' if rechargeable_message.startswith('⚠️') else '') ~ '</b>' %} {{ header ~ '\\n\\n' ~ rechargeable_message }}"
+              message: "{% set header = '<b>' ~ (title_short_charge_low if rechargeable_message.startswith('⚠️') else title_short_charge_ok) ~ (critical_threshold ~ '%' if rechargeable_message.startswith('⚠️') else '') ~ '</b>' %} {{ header ~ '\n\n' ~ rechargeable_message }}"
               parse_mode: html
-          - if:
-              - condition: template
-                value_template: '{{ send_full_report }}'
+            continue_on_error: true
+          - if: '{{ send_full_report }}'
             then:
-              - service: telegram_bot.send_message
+              - action: telegram_bot.send_message
                 data:
                   chat_id: '{{ target_chat_ids }}'
                   message: '{{ full_report_message }}'
                   parse_mode: html
+                continue_on_error: true
 
-  # --- 3. Отправка в VK (Plain Text) ---
-  - alias: Send VK Notification
-    if:
-      - condition: template
-        value_template: "{{ vk_targets | length > 0 }}"
-    then:
-      - action: notify.send_message
-        target:
-          entity_id: "{{ vk_targets }}"
-        data:
-          title: "🔋 Отчет по батареям"
-          message: "{{ (disposable_message ~ '\n\n' ~ rechargeable_message) | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
-      - if:
-          - condition: template
-            value_template: '{{ send_full_report }}'
+      # --- 3. Отправка в VK Notify (HTML) ---
+      - if: '{{ vk_targets | length > 0 }}'
         then:
-          - action: notify.send_message
+          - action: vk_notify.send_message
             target:
               entity_id: "{{ vk_targets }}"
             data:
-              message: "{{ full_report_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+              title: "🔋 Отчет по батареям"
+              message: "{{ disposable_message ~ '\n\n' ~ rechargeable_message }}"
+              parse_mode: html
+              disable_mentions: true
+            continue_on_error: true
+          - if: '{{ send_full_report }}'
+            then:
+              - action: vk_notify.send_message
+                target:
+                  entity_id: "{{ vk_targets }}"
+                data:
+                  title: "📊 Полный отчет по батареям"
+                  message: "{{ full_report_message | replace(title_full_report ~ '\n', '') }}"
+                  parse_mode: html
+                  disable_mentions: true
+                continue_on_error: true
 
-  # --- 4. Отправка в Max (HTML) ---
-  - alias: Send Max Notification
-    if:
-      - condition: template
-        value_template: "{{ max_targets | length > 0 }}"
-    then:
-      - action: notify.send_message
-        target:
-          entity_id: "{{ max_targets }}"
-        data:
-          title: "🔋 Отчет по батареям"
-          message: "{{ disposable_message ~ '\n\n' ~ rechargeable_message }}"
-      - if:
-          - condition: template
-            value_template: '{{ send_full_report }}'
+      # --- 4. Отправка в Max Notify (HTML) ---
+      - if: '{{ max_targets | length > 0 }}'
         then:
-          - action: notify.send_message
+          - action: max_notify.send_message
             target:
               entity_id: "{{ max_targets }}"
             data:
-              message: "{{ full_report_message }}"
+              title: "🔋 Отчет по батареям"
+              message: "{{ disposable_message ~ '\n\n' ~ rechargeable_message }}"
+              format: html
+            continue_on_error: true
+          - if: '{{ send_full_report }}'
+            then:
+              - action: max_notify.send_message
+                target:
+                  entity_id: "{{ max_targets }}"
+                data:
+                  title: "📊 Полный отчет по батареям"
+                  message: "{{ full_report_message | replace(title_full_report ~ '\n', '') }}"
+                  format: html
+                continue_on_error: true
 
 mode: single

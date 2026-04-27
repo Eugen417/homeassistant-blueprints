@@ -1,10 +1,10 @@
 blueprint:
-  name: 📊 Периодический Отчет (ВСЕ классы) v1.2 (Telegram + Max + VK Notify (Keyboard Edition))
+  name: 📊 Периодический Отчет (ВСЕ классы) v1.3 (Параллельная отправка)
   description: >-
     Создает отчет по ВСЕМ датчикам выбранного класса. 
-    Исправлена ошибка JSON-парсера (from_json) при обработке переносов строк.
     Включены все стандартные классы сенсоров. 
     Добавлена поддержка Max Notify и VK Notify с полноценным HTML и заголовками.
+    ✨ НОВОЕ: Уведомления отправляются параллельно. Ошибка (таймаут) в Telegram больше не блокирует отправку в VK и Max.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 
@@ -230,32 +230,36 @@ trigger:
     minutes: !input report_interval_pattern
 
 action:
-  - choose:
-      - conditions: "{{ target_chat_ids | length > 0 }}"
-        sequence:
-          - action: telegram_bot.send_message
+  - parallel:
+      - choose:
+          - conditions: "{{ target_chat_ids | length > 0 }}"
+            sequence:
+              - action: telegram_bot.send_message
+                data:
+                  chat_id: '{{ target_chat_ids }}'
+                  message: "📊 <b>Периодический Отчет по {{ report_title }}</b>\n\nТекущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+                  parse_mode: html
+                continue_on_error: true
+
+      - if: "{{ max_targets | length > 0 }}"
+        then:
+          - action: max_notify.send_message
+            target:
+              entity_id: "{{ max_targets }}"
             data:
-              chat_id: '{{ target_chat_ids }}'
-              message: "📊 <b>Периодический Отчет по {{ report_title }}</b>\n\nТекущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+              title: "<b>📊 Периодический Отчет по {{ report_title }}</b>"
+              message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
+              format: html
+            continue_on_error: true
+
+      - if: "{{ vk_targets | length > 0 }}"
+        then:
+          - action: vk_notify.send_message
+            target:
+              entity_id: "{{ vk_targets }}"
+            data:
+              title: "<b>📊 Периодический Отчет по {{ report_title }}</b>"
+              message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
               parse_mode: html
-
-  - if: "{{ max_targets | length > 0 }}"
-    then:
-      - action: max_notify.send_message
-        target:
-          entity_id: "{{ max_targets }}"
-        data:
-          title: "📊 <b>Периодический Отчет по {{ report_title }}</b>"
-          message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
-          format: html
-
-  - if: "{{ vk_targets | length > 0 }}"
-    then:
-      - action: vk_notify.send_message
-        target:
-          entity_id: "{{ vk_targets }}"
-        data:
-          title: "📊 <b>Периодический Отчет по {{ report_title }}</b>"
-          message: "Текущие показания всех отслеживаемых датчиков (Класс: {{ report_title }}):\n\n{{ report_body }}"
-          parse_mode: html
-          disable_mentions: true
+              disable_mentions: true
+            continue_on_error: true

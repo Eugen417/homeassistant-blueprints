@@ -3,8 +3,8 @@ blueprint:
   description: >-
     Создает отчет по ВСЕМ датчикам выбранного класса. 
     Включены все стандартные классы сенсоров. 
-    Добавлена поддержка Max Notify и VK Notify с полноценным HTML и заголовками.
-    ✨ НОВОЕ: Уведомления отправляются параллельно. Ошибка (таймаут) в Telegram больше не блокирует отправку в VK и Max.
+    Добавлена поддержка Max Notify и VK Notify (Keyboard Edition) с полноценным HTML и заголовками.
+    ✨ НОВОЕ: Уведомления отправляются параллельно. Ошибка (таймаут) в Telegram больше не блокирует отправку в VK Notify (Keyboard Edition) и Max.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 

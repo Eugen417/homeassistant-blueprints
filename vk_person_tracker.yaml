@@ -1,196 +1,194 @@
 blueprint:
-  name: "🏠 VK Tracker v4.2 (Bulletproof Buttons HTML Edition) 📍"
-  description: |
+  name: "🏠 VK Tracker v4.3 (Bulletproof Buttons HTML Edition) 📍"
+  description: >
     Автоматически запрашивает имя и фамилию через VK API.
     Создает динамические кнопки для получения точных координат для ВСЕХ, кто не дома.
-    ✨ **НОВОЕ:** Добавлена поддержка HTML разметки (теги <b>жирный</b>, <i>курсив</i>) и красивые заголовки для интеграции VK Notify (Keyboard Edition) ⌨️.
+
+    ✨ **НОВОЕ:** Добавлено принудительное гашение "крутящихся колес" (Spinner) на кнопках.
+    Поддержка HTML разметки (теги <b>жирный</b>, <i>курсив</i>) и красивые заголовки.
   domain: automation
-  
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/vk_person_tracker.yaml
-  
   input:
     tracked_persons:
       name: "📝 Пользователи"
       selector:
         entity:
-          domain: person
+          domain:
+          - person
           multiple: true
+          reorder: false
     vk_notifications:
-      name: "➤ Сервис VK"
+      name: ➤ Сервис VK
       selector:
         entity:
           integration: vk_notify
-          domain: notify
+          domain:
+          - notify
+          reorder: false
+          multiple: false
     vk_phonebook:
       name: "📖 Резервная телефонная книга"
-      description: "Используется, если API ВК недоступно."
+      description: Используется, если API ВК недоступно.
       default: {}
       selector:
         object:
+          multiple: false
     message_home:
       name: "🏡 Фраза: Пришел домой"
-      description: "Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!"
+      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "🏡 <b>{name}</b> вернулся(ась) домой! 👋"
     message_zone:
       name: "📍 Фраза: Прибыл в зону"
-      description: "Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!"
+      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "📍 <b>{name}</b> прибыл(а) в: <b>{zone}</b>"
     message_away:
       name: "🚶 Фраза: В пути"
-      description: "Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!"
+      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "🚶 <b>{name}</b> в пути (покинул <i>{zone}</i>)."
-
 mode: parallel
 max: 10
-
 trigger:
-  - platform: state
-    entity_id: !input tracked_persons
-    not_to: ["unknown", "unavailable"]
-    id: "person_moved"
-  - platform: event
-    event_type: vk_notify_callback
-    event_data:
-      entity_id: !input vk_notifications
-    id: "location_request"
-
+- platform: state
+  entity_id: !input tracked_persons
+  not_to:
+  - unknown
+  - unavailable
+  id: person_moved
+- platform: event
+  event_type: vk_notify_callback
+  event_data:
+    entity_id: !input vk_notifications
+  id: location_request
 action:
-  - variables:
-      vk_notifications_id: !input vk_notifications
-      tracked_persons_ids: !input tracked_persons
-      vk_names: !input vk_phonebook
-      phrase_home: !input message_home
-      phrase_zone: !input message_zone
-      phrase_away: !input message_away
-
-  - choose:
-      # --- ЛОГИКА ОПРЕДЕЛЕНИЯ ИМЕНИ ПРИ НАЖАТИИ КНОПКИ ---
+- variables:
+    vk_notifications_id: !input vk_notifications
+    tracked_persons_ids: !input tracked_persons
+    vk_names: !input vk_phonebook
+    phrase_home: !input message_home
+    phrase_zone: !input message_zone
+    phrase_away: !input message_away
+- choose:
+  - conditions:
+    - condition: trigger
+      id: location_request
+    sequence:
+    # === ГАСИМ КРУЖОК ЗАГРУЗКИ СРАЗУ ПОСЛЕ НАЖАТИЯ ===
+    - action: vk_notify.answer_callback
+      target:
+        entity_id: '{{ vk_notifications_id }}'
+      data:
+        event_id: '{{ trigger.event.data.event_id }}'
+        user_id: '{{ trigger.event.data.user_id }}'
+      continue_on_error: true
+    # ================================================
+    
+    - action: vk_notify.get_user_info
+      data:
+        entity_id: '{{ vk_notifications_id }}'
+        user_id: '{{ trigger.event.data.user_id }}'
+      response_variable: vk_api_user
+    - variables:
+        payload_data: >-
+          {% set p = trigger.event.data.payload | default({}) %} {% if
+          p is string %} {{ p | from_json }} {% else %} {{ p }} {% endif %}
+        real_name: >-
+          {% set u_info = vk_api_user.get(vk_notifications_id, {}) %} {%
+          set api_name = u_info.get('full_name', 'Неизвестно') %} {% if api_name not
+          in ['Неизвестно', 'Система', ''] %}
+            {{ api_name }}
+          {% else %}
+            {{ vk_names.get(trigger.event.data.user_id | string, 'Пользователь') }}
+          {% endif %}
+    - choose:
       - conditions:
-          - condition: trigger
-            id: "location_request"
+        - condition: template
+          value_template: '{{ payload_data.get(''action'') == ''where_all'' }}'
         sequence:
-          # 1. Запрашиваем инфо у ВК
-          - action: vk_notify.get_user_info
-            data:
-              entity_id: "{{ vk_notifications_id }}"
-              user_id: "{{ trigger.event.data.user_id }}"
-            response_variable: vk_api_user
-          
-          # 2. Правильно извлекаем имя
-          - variables:
-              payload_data: >-
-                {% set p = trigger.event.data.payload | default({}) %}
-                {% if p is string %} {{ p | from_json }} {% else %} {{ p }} {% endif %}
-              real_name: >-
-                {% set u_info = vk_api_user.get(vk_notifications_id, {}) %}
-                {% set api_name = u_info.get('full_name', 'Неизвестно') %}
-                {% if api_name not in ['Неизвестно', 'Система', ''] %}
-                  {{ api_name }}
-                {% else %}
-                  {{ vk_names.get(trigger.event.data.user_id | string, 'Пользователь') }}
-                {% endif %}
-
-          - choose:
-              # КНОПКА: ГДЕ ВСЕ?
-              - conditions:
-                  - condition: template
-                    value_template: "{{ payload_data.get('action') == 'where_all' }}"
-                sequence:
-                  - action: vk_notify.send_message
-                    data:
-                      title: "<b>🌐 Общий статус</b>"
-                      entity_id: "{{ vk_notifications_id }}"
-                      message: "🔎 <b>{{ real_name }}</b>, статус всех отслеживаемых:"
-                      parse_mode: html
-                  - repeat:
-                      for_each: "{{ tracked_persons_ids }}"
-                      sequence:
-                        - if:
-                            - condition: template
-                              value_template: "{{ state_attr(repeat.item, 'latitude') is not none }}"
-                          then:
-                            - action: vk_notify.send_message
-                              data:
-                                title: "📍 Локация: {{ state_attr(repeat.item, 'friendly_name') }}"
-                                entity_id: "{{ vk_notifications_id }}"
-                                message: "Статус: <b>{{ 'Дома' if states(repeat.item) == 'home' else ('В пути' if states(repeat.item) == 'not_home' else states(repeat.item)) }}</b>"
-                                lat: "{{ state_attr(repeat.item, 'latitude') }}"
-                                long: "{{ state_attr(repeat.item, 'longitude') }}"
-                                parse_mode: html
-
-              # КНОПКА: ГДЕ КОНКРЕТНЫЙ ЧЕЛОВЕК?
-              - conditions:
-                  - condition: template
-                    value_template: "{{ payload_data.get('action') == 'where_person' }}"
-                sequence:
-                  - variables:
-                      target: "person.{{ payload_data.get('person') }}"
-                  - action: vk_notify.send_message
-                    data:
-                      title: "<b>📍 Запрос местоположения</b>"
-                      entity_id: "{{ vk_notifications_id }}"
-                      message: "🔎 <b>{{ real_name }}</b>, <b>{{ state_attr(target, 'friendly_name') }}</b> сейчас находится здесь:"
-                      lat: "{{ state_attr(target, 'latitude') }}"
-                      long: "{{ state_attr(target, 'longitude') }}"
-                      parse_mode: html
-
-      # --- ЛОГИКА ПЕРЕМЕЩЕНИЙ ---
+        - action: vk_notify.send_message
+          data:
+            title: "<b>🌐 Общий статус</b>"
+            entity_id: '{{ vk_notifications_id }}'
+            message: "🔎 <b>{{ real_name }}</b>, статус всех отслеживаемых:"
+            parse_mode: html
+        - repeat:
+            for_each: '{{ tracked_persons_ids }}'
+            sequence:
+            - if:
+              - condition: template
+                value_template: '{{ state_attr(repeat.item, ''latitude'') is not none }}'
+              then:
+              - action: vk_notify.send_message
+                data:
+                  title: "📍 Локация: {{ state_attr(repeat.item, 'friendly_name') }}"
+                  entity_id: '{{ vk_notifications_id }}'
+                  message: 'Статус: <b>{{ ''Дома'' if states(repeat.item) == ''home'' else (''В пути'' if states(repeat.item) == ''not_home'' else states(repeat.item)) }}</b>'
+                  lat: '{{ state_attr(repeat.item, ''latitude'') }}'
+                  long: '{{ state_attr(repeat.item, ''longitude'') }}'
+                  parse_mode: html
       - conditions:
-          - condition: trigger
-            id: "person_moved"
+        - condition: template
+          value_template: '{{ payload_data.get(''action'') == ''where_person'' }}'
         sequence:
-          - variables:
-              person_name: "{{ state_attr(trigger.entity_id, 'friendly_name') }}"
-              to_state: "{{ trigger.to_state.state }}"
-          - choose:
-              # 1. Пришел домой (Только текст, без кнопок)
-              - conditions:
-                  - condition: template
-                    value_template: "{{ to_state == 'home' }}"
-                sequence:
-                  - action: vk_notify.send_message
-                    data:
-                      title: "<b>🏠 Возвращение домой</b>"
-                      entity_id: "{{ vk_notifications_id }}"
-                      message: "{{ phrase_home | replace('{name}', person_name) }}"
-                      parse_mode: html
-              
-              # 2. В зону / В путь (Текст + Кнопки)
-              - conditions:
-                  - condition: template
-                    value_template: "{{ to_state != 'home' }}"
-                sequence:
-                  - action: vk_notify.send_message
-                    data:
-                      title: "<b>🚶 Изменение локации</b>"
-                      entity_id: "{{ vk_notifications_id }}"
-                      message: >-
-                        {% if to_state == 'not_home' %}
-                          {{ phrase_away | replace('{name}', person_name) | replace('{zone}', 'Дом' if trigger.from_state.state == 'home' else trigger.from_state.state) }}
-                        {% else %}
-                          {{ phrase_zone | replace('{name}', person_name) | replace('{zone}', to_state) }}
-                        {% endif %}
-                      parse_mode: html
-                      keyboard:
-                        inline: true
-                        buttons: >-
-                          {% set ns = namespace(buttons=[]) %}
-                          
-                          {# Перебираем ID пользователей напрямую (БЕЗ глючного expand) #}
-                          {% for p_id in tracked_persons_ids %}
-                            {% set current_state = to_state if p_id == trigger.entity_id else states(p_id) %}
-                            {% if current_state != 'home' %}
-                              {% set fname = state_attr(p_id, 'friendly_name') %}
-                              {% set slug = p_id.split('.')[1] %}
-                              
-                              {% if p_id == trigger.entity_id %}
-                                {% set btn = {"action": {"type": "callback", "label": "📍 Место: " ~ fname, "payload": {"action": "where_person", "person": slug}}, "color": "primary"} %}
-                              {% else %}
-                                {% set btn = {"action": {"type": "callback", "label": "Где " ~ fname ~ "?", "payload": {"action": "where_person", "person": slug}}} %}
-                              {% endif %}
-                              
-                              {% set ns.buttons = ns.buttons + [[btn]] %}
-                            {% endif %}
-                          {% endfor %}
-                          
-                          {{ ns.buttons + [[{"action": {"type": "callback", "label": "🌍 Где все?", "payload": {"action": "where_all"}}}]] }}
+        - variables:
+            target: person.{{ payload_data.get('person') }}
+        - action: vk_notify.send_message
+          data:
+            title: "<b>📍 Запрос местоположения</b>"
+            entity_id: '{{ vk_notifications_id }}'
+            message: "🔎 <b>{{ real_name }}</b>, <b>{{ state_attr(target, 'friendly_name') }}</b> сейчас находится здесь:"
+            lat: '{{ state_attr(target, ''latitude'') }}'
+            long: '{{ state_attr(target, ''longitude'') }}'
+            parse_mode: html
+  - conditions:
+    - condition: trigger
+      id: person_moved
+    sequence:
+    - variables:
+        person_name: '{{ state_attr(trigger.entity_id, ''friendly_name'') }}'
+        to_state: '{{ trigger.to_state.state }}'
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ to_state == ''home'' }}'
+        sequence:
+        - action: vk_notify.send_message
+          data:
+            title: "<b>🏡 Возвращение домой</b>"
+            entity_id: '{{ vk_notifications_id }}'
+            message: '{{ phrase_home | replace(''{name}'', person_name) }}'
+            parse_mode: html
+      - conditions:
+        - condition: template
+          value_template: '{{ to_state != ''home'' }}'
+        sequence:
+        - action: vk_notify.send_message
+          data:
+            title: "<b>🚶 Изменение локации</b>"
+            entity_id: '{{ vk_notifications_id }}'
+            message: >-
+              {% if to_state == 'not_home' %}
+                {{ phrase_away | replace('{name}', person_name) | replace('{zone}', 'Дом' if trigger.from_state.state == 'home' else trigger.from_state.state) }}
+              {% else %}
+                {{ phrase_zone | replace('{name}', person_name) | replace('{zone}', to_state) }}
+              {% endif %}
+            parse_mode: html
+            keyboard:
+              inline: true
+              buttons: >-
+                {% set ns = namespace(buttons=[]) %}
+                {% for p_id in tracked_persons_ids %}
+                  {% set current_state = to_state if p_id == trigger.entity_id else states(p_id) %}
+                  {% if current_state != 'home' %}
+                    {% set fname = state_attr(p_id, 'friendly_name') %}
+                    {% set slug = p_id.split('.')[1] %}
+                    
+                    {% if p_id == trigger.entity_id %}
+                      {% set btn = {"action": {"type": "callback", "label": "📍 Место: " ~ fname, "payload": {"action": "where_person", "person": slug}}, "color": "primary"} %}
+                    {% else %}
+                      {% set btn = {"action": {"type": "callback", "label": "Где " ~ fname ~ "?", "payload": {"action": "where_person", "person": slug}}} %}
+                    {% endif %}
+                    
+                    {% set ns.buttons = ns.buttons + [[btn]] %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.buttons + [[{"action": {"type": "callback", "label": "🌍 Где все?", "payload": {"action": "where_all"}}}]] }}

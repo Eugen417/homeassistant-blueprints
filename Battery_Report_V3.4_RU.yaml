@@ -1,11 +1,11 @@
 blueprint:
-  name: 🪫 Отчет по состоянию батарей (v3.10.0)
+  name: 🪫 Отчет по состоянию батарей (v3.11.0 Parallel HTML Edition)
   description: |
     Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
     Отправляет отчеты на мобильное устройство, в Telegram, VK и/или Max в заданное время.
     
-    **v3.10.0:** Max Notify переведен на выбор сущностей и HTML-форматирование (аналогично Telegram). VK Notify отправляет Plain Text с сохранением переносов строк. Увеличен отступ перед списком "Устройства без связи".
-    **OFFLINE:** В полный отчет добавлены устройства, которые потеряли связь.
+    **v3.11.0:** Max Notify и VK Notify переведены на нативные службы с поддержкой HTML и выделенных заголовков.
+    Отправка во все мессенджеры теперь выполняется параллельно — ошибка в одном не блокирует остальные!
     
     **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
@@ -62,7 +62,7 @@ blueprint:
 
     vk_notify_target:
       name: "💬 Уведомления VK Notify"
-      description: "Выберите сущности VK Notify. Отправка будет без HTML-тегов, но с сохранением структуры списка."
+      description: "Выберите сущности VK Notify. Отправка будет с поддержкой HTML."
       default:
         entity_id: []
       selector:
@@ -72,7 +72,7 @@ blueprint:
 
     max_notify_target:
       name: "💬 Уведомления Max Notify"
-      description: "Выберите сущности Max Notify. Отправка в формате HTML (в настройках интеграции Max должен быть выбран HTML)."
+      description: "Выберите сущности Max Notify. Отправка в формате HTML."
       default:
         entity_id: []
       selector:
@@ -233,7 +233,7 @@ blueprint:
         text:
     title_full_report:
       name: 📊 Заголовок (Полный отчет)
-      default: "🔋 <b>Полный отчет Батарея+ (Отсортирован по уровню):</b>"
+      default: "🔋 Полный отчет Батарея+ (Отсортирован по уровню):"
       selector:
         text:
 
@@ -270,6 +270,22 @@ variables:
   title_full_report: !input title_full_report
 
   # --- Target logic ---
+  target_chat_ids: >-
+    {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
+    {% set selected_entities = [selected_entities_raw] | flatten %}
+    {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
+    {% set ns = namespace(target_ids=[]) %}
+    {% for id_string in chat_id_strings %}
+      {% set cleaned_id = id_string | string | trim %}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set id_with_hyphen = '-' ~ cleaned_id %}
+        {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.target_ids }}
+    
   vk_targets: >-
     {% set raw = vk_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
@@ -385,7 +401,7 @@ action:
               {% set details = "" %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
-                {# Экранирование данных, которые будут вставлены в HTML #}
+                {# Экранирование данных #}
                 {% set escaped_battery_type = battery_type | string | replace('<', '&lt;') | replace('>', '&gt;') %}
                 {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
                 {% set details = " (Тип: " ~ escaped_battery_type ~ ", Кол-во: " ~ escaped_quantity ~ " шт)" %}
@@ -448,16 +464,11 @@ action:
       offline_sensors_report: >-
         {% set ns = namespace(offline_lines=[]) %}
         {% for sensor in states.sensor %}
-          {# Проверяем наличие атрибута battery_last_reported_level (значит это батарейка) #}
           {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
-            {# Но сам статус сенсора сейчас недоступен #}
             {% if sensor.state in ['unavailable', 'unknown'] %}
               {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
               {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
-              
-              {# Экранирование имени устройства #}
               {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
-              
               {% set line = "❓ " ~ escaped_name ~ " (Статус: " ~ sensor.state ~ ")" %}
               {% set ns.offline_lines = ns.offline_lines + [line] %}
             {% endif %}
@@ -480,11 +491,10 @@ action:
         {% endfor %}
         {{ total.value }}
         
-      # СБОРКА ПОЛНОГО ОТЧЕТА (HTML) - ПОРЯДОК: Заголовок -> Кол-во -> Список -> Типы -> (отступ) -> Офлайн
-      full_report_message: >
+      # СБОРКА ТЕЛА ПОЛНОГО ОТЧЕТА (БЕЗ ЗАГОЛОВКА, ДЛЯ VK И MAX)
+      full_report_body: >
         {% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %}
-        {% set header = title_full_report %}
-        {{ header ~ '\n' ~ total_text ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary ~ '\n\n' ~ offline_sensors_report }}
+        {{ total_text ~ '\n\n' ~ full_report_body_list ~ '\n\n' ~ battery_types_summary ~ '\n\n' ~ offline_sensors_report }}
 
 
   # ----------------------------------------------------------------------
@@ -502,105 +512,71 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          # 2.1 Мобильное приложение
-          - alias: Мобильное приложение - Отчет о незаряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
-                sequence:
+          - parallel:
+              # 2.1 Мобильное приложение
+              - if: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
+                then:
                   - action: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_replace_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_replace_ok }}
+                          {{ title_short_replace_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
                       message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}" 
-          
-          # 2.2 Telegram Bot (HTML)
-          - alias: Telegram - Определить целевые ID чатов для Отчета 1
-            variables:
-              target_chat_ids: >-
-                {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
-                {% set selected_entities = [selected_entities_raw] | flatten %}
-                {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
-                {% set ns = namespace(target_ids=[]) %}
-                {% for id_string in chat_id_strings %}
-                  {% set cleaned_id = id_string | string | trim %}
-                  {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
-                    {% set id_with_hyphen = '-' ~ cleaned_id %}
-                    {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
-                  {% else %}
-                    {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.target_ids }}
-
-          - alias: Telegram - Отчет о незаряжаемых (HTML)
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ target_chat_ids | length > 0 }}" 
-                sequence:
+                    continue_on_error: true
+        
+              # 2.2 Telegram Bot (HTML)
+              - if: "{{ target_chat_ids | length > 0 }}"
+                then:
                   - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}" 
                       message: |
-                        {% set report_body = disposable_message %}
-                        {% if report_body.startswith('⚠️') %}
+                        {% if disposable_message.startswith('⚠️') %}
                           {% set header = '<b>' ~ title_short_replace_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
                         {% else %}
                           {% set header = '<b>' ~ title_short_replace_ok ~ '</b>' %}
                         {% endif %}
-                        {{ header ~ "\n\n" ~ report_body }}
+                        {{ header ~ "\n\n" ~ disposable_message }}
                       parse_mode: html
+                    continue_on_error: true
                       
-          # 2.3 VK Notify (Plain text)
-          - alias: VK Notify - Отчет о незаряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 2.3 VK Notify (HTML)
+              - if: "{{ vk_targets | length > 0 }}"
+                then:
+                  - action: vk_notify.send_message
                     target:
                       entity_id: "{{ vk_targets }}"
                     data:
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_replace_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_replace_ok }}
+                          {{ title_short_replace_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
-                      message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+                      message: "{{ disposable_message }}"
+                      parse_mode: html
+                      disable_mentions: true
+                    continue_on_error: true
 
-          # 2.4 Max Notify (HTML)
-          - alias: Max Notify - Отчет о незаряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ max_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 2.4 Max Notify (HTML)
+              - if: "{{ max_targets | length > 0 }}"
+                then:
+                  - action: max_notify.send_message
                     target:
                       entity_id: "{{ max_targets }}"
                     data:
                       title: >
                         {% if disposable_message.startswith('⚠️') %}
-                          {{ title_short_replace_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_replace_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_replace_ok }}
+                          {{ title_short_replace_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
-                      message: |
-                        {% set report_body = disposable_message %}
-                        {% if report_body.startswith('⚠️') %}
-                          {% set header = '<b>' ~ title_short_replace_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
-                        {% else %}
-                          {% set header = '<b>' ~ title_short_replace_ok ~ '</b>' %}
-                        {% endif %}
-                        {{ header ~ "\n\n" ~ report_body }}
+                      message: "{{ disposable_message }}"
+                      format: html
+                    continue_on_error: true
 
   # ----------------------------------------------------------------------
   # 3. ОТПРАВКА ОТЧЕТА 2: ЗАРЯЖАЕМЫЕ (ЗАРЯДКА)
@@ -617,127 +593,75 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          # 3.1 Мобильное приложение
-          - alias: Мобильное приложение - Отчет о заряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
-                sequence:
+          - parallel:
+              # 3.1 Мобильное приложение
+              - if: "{{ mobile_device_id is not none and mobile_device_id != '' }}"
+                then:
                   - action: notify.mobile_app_{{ device_attr(mobile_device_id, 'name') | lower | replace(' ', '_') | replace('-', '_') }}
                     data:
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_charge_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_charge_ok }}
+                          {{ title_short_charge_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
                       message: "{{ rechargeable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
-          
-          # 3.2 Telegram Bot (HTML)
-          - alias: Telegram - Определить целевые ID чатов для Отчета 2
-            variables:
-              target_chat_ids: >-
-                {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
-                {% set selected_entities = [selected_entities_raw] | flatten %}
-                {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
-                {% set ns = namespace(target_ids=[]) %}
-                {% for id_string in chat_id_strings %}
-                  {% set cleaned_id = id_string | string | trim %}
-                  {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
-                    {% set id_with_hyphen = '-' ~ cleaned_id %}
-                    {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
-                  {% else %}
-                    {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.target_ids }}
-
-          - alias: Telegram - Отчет о заряжаемых (HTML)
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ target_chat_ids | length > 0 }}"
-                sequence:
+                    continue_on_error: true
+        
+              # 3.2 Telegram Bot (HTML)
+              - if: "{{ target_chat_ids | length > 0 }}"
+                then:
                   - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}" 
                       message: |
-                        {% set report_body = rechargeable_message %}
-                        {% if report_body.startswith('⚠️') %}
+                        {% if rechargeable_message.startswith('⚠️') %}
                           {% set header = '<b>' ~ title_short_charge_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
                         {% else %}
                           {% set header = '<b>' ~ title_short_charge_ok ~ '</b>' %}
                         {% endif %}
-                        {{ header ~ "\n\n" ~ report_body }}
+                        {{ header ~ "\n\n" ~ rechargeable_message }}
                       parse_mode: html
+                    continue_on_error: true
                       
-          # 3.3 VK Notify (Plain text)
-          - alias: VK Notify - Отчет о заряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 3.3 VK Notify (HTML)
+              - if: "{{ vk_targets | length > 0 }}"
+                then:
+                  - action: vk_notify.send_message
                     target:
                       entity_id: "{{ vk_targets }}"
                     data:
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_charge_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_charge_ok }}
+                          {{ title_short_charge_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
-                      message: "{{ rechargeable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+                      message: "{{ rechargeable_message }}"
+                      parse_mode: html
+                      disable_mentions: true
+                    continue_on_error: true
 
-          # 3.4 Max Notify (HTML)
-          - alias: Max Notify - Отчет о заряжаемых
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ max_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 3.4 Max Notify (HTML)
+              - if: "{{ max_targets | length > 0 }}"
+                then:
+                  - action: max_notify.send_message
                     target:
                       entity_id: "{{ max_targets }}"
                     data:
                       title: >
                         {% if rechargeable_message.startswith('⚠️') %}
-                          {{ title_short_charge_low ~ critical_threshold ~ "%" }}
+                          {{ title_short_charge_low | replace('<b>', '') | replace('</b>', '') ~ critical_threshold ~ "%" }}
                         {% else %}
-                          {{ title_short_charge_ok }}
+                          {{ title_short_charge_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
-                      message: |
-                        {% set report_body = rechargeable_message %}
-                        {% if report_body.startswith('⚠️') %}
-                          {% set header = '<b>' ~ title_short_charge_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
-                        {% else %}
-                          {% set header = '<b>' ~ title_short_charge_ok ~ '</b>' %}
-                        {% endif %}
-                        {{ header ~ "\n\n" ~ report_body }}
-  
+                      message: "{{ rechargeable_message }}"
+                      format: html
+                    continue_on_error: true
+
   # ----------------------------------------------------------------------
   # 4. ОТПРАВКА ОТЧЕТА 3: ПОЛНЫЙ СПИСОК (ОПЦИОНАЛЬНО)
   # ----------------------------------------------------------------------
-  - alias: Telegram - Определить целевые ID чатов для Полного Отчета
-    variables:
-      target_chat_ids: >-
-        {% set selected_entities_raw = telegram_notify_entities.entity_id | default([]) %}
-        {% set selected_entities = [selected_entities_raw] | flatten %}
-        {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %}
-        {% set ns = namespace(target_ids=[]) %}
-        {% for id_string in chat_id_strings %}
-          {% set cleaned_id = id_string | string | trim %}
-          {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
-            {% set id_with_hyphen = '-' ~ cleaned_id %}
-            {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
-          {% else %}
-            {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
-          {% endif %}
-        {% endfor %}
-        {{ ns.target_ids }}
-    
   - alias: Отправить Полный отчет
     choose:
       - conditions:
@@ -752,44 +676,40 @@ action:
                 {{ true }}
               {% endif %}
         sequence:
-          # 4.1 Полный отчет - Telegram
-          - alias: Telegram - Отправить Полный отчет
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ target_chat_ids | length > 0 }}"
-                sequence:
+          - parallel:
+              # 4.1 Полный отчет - Telegram
+              - if: "{{ target_chat_ids | length > 0 }}"
+                then:
                   - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}" 
-                      message: "{{ full_report_message }}"
+                      message: "<b>{{ title_full_report | replace('<b>', '') | replace('</b>', '') }}</b>\n\n{{ full_report_body }}"
                       parse_mode: html
+                    continue_on_error: true
                       
-          # 4.2 Полный отчет - VK Notify
-          - alias: VK Notify - Отправить Полный отчет
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ vk_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 4.2 Полный отчет - VK Notify
+              - if: "{{ vk_targets | length > 0 }}"
+                then:
+                  - action: vk_notify.send_message
                     target:
                       entity_id: "{{ vk_targets }}"
                     data:
-                      message: "{{ full_report_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
+                      title: "{{ title_full_report | replace('<b>', '') | replace('</b>', '') }}"
+                      message: "{{ full_report_body }}"
+                      parse_mode: html
+                      disable_mentions: true
+                    continue_on_error: true
                       
-          # 4.3 Полный отчет - Max Notify (HTML)
-          - alias: Max Notify - Отправить Полный отчет
-            choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ max_targets | length > 0 }}"
-                sequence:
-                  - action: notify.send_message
+              # 4.3 Полный отчет - Max Notify (HTML)
+              - if: "{{ max_targets | length > 0 }}"
+                then:
+                  - action: max_notify.send_message
                     target:
                       entity_id: "{{ max_targets }}"
                     data:
                       title: "{{ title_full_report | replace('<b>', '') | replace('</b>', '') }}"
-                      message: "{{ full_report_message }}"
-  
+                      message: "{{ full_report_body }}"
+                      format: html
+                    continue_on_error: true
+
 mode: single

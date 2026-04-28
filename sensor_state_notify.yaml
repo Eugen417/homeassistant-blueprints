@@ -1,10 +1,11 @@
 blueprint:
-  name: 📊 Периодический Отчет (ВСЕ классы) v1.3 (Параллельная отправка)
+  name: 📊 Периодический Отчет (ВСЕ классы) v1.5 (Фикс дублей + Параллельно)
   description: >-
     Создает отчет по ВСЕМ датчикам выбранного класса. 
     Включены все стандартные классы сенсоров. 
     Добавлена поддержка Max Notify и VK Notify (Keyboard Edition) с полноценным HTML и заголовками.
-    ✨ НОВОЕ: Уведомления отправляются параллельно. Ошибка (таймаут) в Telegram больше не блокирует отправку в VK Notify (Keyboard Edition) и Max.
+    ✨ НОВОЕ: Автоматически исключаются дубликаты сенсоров от интеграции Battery Notes (battery_plus).
+    Уведомления отправляются параллельно. Ошибка (таймаут) в Telegram больше не блокирует отправку в VK и Max.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/sensor_state_notify.yaml 
 
@@ -203,6 +204,7 @@ variables:
     {% set report_lines = namespace(output=[]) %}
     {%- for sensor in states.sensor
           | selectattr('attributes.device_class', 'eq', target_class)
+          | rejectattr('entity_id', 'search', 'battery_plus')
           | sort(attribute='name') -%}
       {%- set sensor_is_excluded = sensor.entity_id in excluded_ids -%}
       {%- if sensor_is_excluded == false -%}

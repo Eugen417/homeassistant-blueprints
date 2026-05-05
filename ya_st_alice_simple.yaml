@@ -1,0 +1,122 @@
+alias: "Алиса: Умный рупор"
+description: >
+  Графический Интерфейс настройки TTS уведомлений для Яндекс станций.
+  Cкрипт для Yandex.Station(Графический Интерфейс настройки TTS уведомлений для Яндекс станций)после его установки, в Автоматизациях выбирая этот скрипт в блоке: Тогда Появляется человеческий интерфейс настройки использующий под капотом: сервис tts.yandex_station_say.
+  Сам скрипт настраивать не надо(это только Шаблон/Графический интерфейс для настройки TTS для Yandex.Station).
+  Установка и настройка:
+  Установка скрипта: Идем в Настройки > Автоматизации и сцены > Скрипты, создаём новый скрипт, далее переключаемся в текстовый редактор и заменяем/вставляем код скрипта как есть и сохраняемся. Готово!
+  Настройка TTS автоматизаций: В автоматизации в блоке: Тогда выбираем Выполнить действие затем находим наш скрипт "Алиса: Умный рупор" откроется дружественный пользовательский интерфейс где надо будет выбрать Яндекс станцию, вписать текст уведомления и настроить/выбрать аудио эффекты и громкость
+
+icon: mdi:account-voice
+mode: single
+fields:
+  target_station:
+    name: Колонка
+    description: Выберите колонку для воспроизведения
+    required: true
+    selector:
+      entity:
+        domain: media_player
+        integration: yandex_station
+  message:
+    name: Сообщение
+    description: Текст для озвучивания
+    required: true
+    selector:
+      text:
+        multiline: true
+  volume_level:
+    name: Громкость
+    description: Уровень громкости произношения (0.1 - тихо, 1.0 - максимум)
+    required: true
+    default: 0.5
+    selector:
+      number:
+        min: 0.1
+        max: 1
+        step: 0.1
+        mode: slider
+  voice:
+    name: Голос
+    description: Выбор персонажа (пусто = голос колонки по умолчанию)
+    default: ""
+    selector:
+      select:
+        options:
+          - label: Стандартный (Алиса)
+            value: ""
+          - label: Оксана
+            value: oksana
+          - label: Джейн
+            value: jane
+          - label: Омаж
+            value: omazh
+          - label: Захар
+            value: zahar
+          - label: Ермил
+            value: ermil
+  effect:
+    name: Эффект
+    default: ""
+    selector:
+      select:
+        options:
+          - label: Без эффекта
+            value: ""
+          - label: Рупор
+            value: megaphone
+          - label: Гелий
+            value: helium
+          - label: Дарт Вейдер
+            value: darth_vader
+          - label: Бурундук
+            value: chipmunk
+          - label: Эхо
+            value: echo
+  is_whisper:
+    name: Шёпот
+    description: Произнести фразу шёпотом
+    default: false
+    selector:
+      boolean: {}
+  prefix_sound:
+    name: Звук перед фразой
+    description: Библиотека встроенных звуков
+    default: ""
+    selector:
+      select:
+        options:
+          - label: Без звука
+            value: ""
+          - label: Успех (Game Win)
+            value: alice-sounds-game-win-1.opus
+          - label: Уведомление (Ping)
+            value: alice-sounds-things-notification-1.opus
+          - label: Сирена (Siren)
+            value: alice-sounds-things-siren-1.opus
+          - label: Магия (Magic)
+            value: alice-sounds-game-magic-1.opus
+sequence:
+  - variables:
+      compiled_message: |-
+        {% set tags = [] %}
+        {% if prefix_sound != "" %}
+          {% set tags = tags + ['<speaker audio="' ~ prefix_sound ~ '">'] %}
+        {% endif %}
+        {% if voice != "" %}
+          {% set tags = tags + ['<speaker voice="' ~ voice ~ '">'] %}
+        {% endif %}
+        {% if effect != "" %}
+          {% set tags = tags + ['<speaker effect="' ~ effect ~ '">'] %}
+        {% endif %}
+        {% if is_whisper %}
+          {% set tags = tags + ['<speaker is_whisper="true">'] %}
+        {% endif %}
+        {{ tags | join(' ') }} {{ message }}
+  - action: tts.yandex_station_say
+    target:
+      entity_id: "{{ target_station }}"
+    data:
+      message: "{{ compiled_message }}"
+      options:
+        volume_level: "{{ volume_level }}"

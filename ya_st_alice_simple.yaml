@@ -1,7 +1,8 @@
 alias: "Алиса: Умный рупор"
 description: >
-  v2.0 Визуальный Интерфейс настройки TTS уведомлений для Яндекс станций. Cкрипт
-  для Yandex.Station(Визуальный Интерфейс настройки TTS уведомлений для Яндекс
+  v3.0 Визуальный Интерфейс настройки TTS уведомлений для Яндекс станций. Полная
+  база звуков, эффектов и поддержка пользовательских аудиофайлов. Cкрипт для
+  Yandex.Station(Визуальный Интерфейс настройки TTS уведомлений для Яндекс
   станций)после его установки, в Автоматизациях выбирая этот скрипт в блоке:
   Тогда Появляется человеческий интерфейс настройки использующий под капотом:
   сервис tts.yandex_station_say. Сам скрипт настраивать не надо(это только
@@ -91,21 +92,334 @@ fields:
       boolean: {}
   prefix_sound:
     name: Звук перед фразой
-    description: Библиотека встроенных звуков
+    description: Выберите из списка или вставьте свой ID (dialogs-upload/...)
     default: ""
     selector:
       select:
+        custom_value: true
         options:
-          - label: Без звука
+          - label: 🔇 Без звука
             value: ""
-          - label: Успех (Game Win)
-            value: alice-sounds-game-win-1.opus
-          - label: Уведомление (Ping)
-            value: alice-sounds-things-notification-1.opus
-          - label: Сирена (Siren)
+          - label: 🪚 [Вещи] Бензопила
+            value: alice-sounds-things-chainsaw-1.opus
+          - label: 💥 [Вещи] Взрыв
+            value: alice-sounds-things-explosion-1.opus
+          - label: 🚰 [Вещи] Вода (наливается в стакан)
+            value: alice-sounds-things-water-3.opus
+          - label: 🚰 [Вещи] Вода №1 (льется)
+            value: alice-sounds-things-water-1.opus
+          - label: 🚰 [Вещи] Вода №2 (бурлит)
+            value: alice-sounds-things-water-2.opus
+          - label: 🔘 [Вещи] Выключатель №1
+            value: alice-sounds-things-switch-1.opus
+          - label: 🔘 [Вещи] Выключатель №2
+            value: alice-sounds-things-switch-2.opus
+          - label: 🔫 [Вещи] Выстрел (дробовик)
+            value: alice-sounds-things-gun-1.opus
+          - label: 🚢 [Вещи] Гудок корабля №1
+            value: alice-sounds-transport-ship-horn-1.opus
+          - label: 🚢 [Вещи] Гудок корабля №2
+            value: alice-sounds-transport-ship-horn-2.opus
+          - label: 🚪 [Вещи] Дверь №1
+            value: alice-sounds-things-door-1.opus
+          - label: 🚪 [Вещи] Дверь №2
+            value: alice-sounds-things-door-2.opus
+          - label: 🥂 [Вещи] Звон бокалов
+            value: alice-sounds-things-glass-2.opus
+          - label: 🔔 [Вещи] Колокол №1
+            value: alice-sounds-things-bell-1.opus
+          - label: 🔔 [Вещи] Колокол №2
+            value: alice-sounds-things-bell-2.opus
+          - label: 🚗 [Вещи] Машина (заводится)
+            value: alice-sounds-things-car-1.opus
+          - label: 🚗 [Вещи] Машина (не заводится)
+            value: alice-sounds-things-car-2.opus
+          - label: 🗡️ [Вещи] Меч (выходит из ножен)
+            value: alice-sounds-things-sword-2.opus
+          - label: 🗡️ [Вещи] Меч (парирование)
+            value: alice-sounds-things-sword-1.opus
+          - label: 🗡️ [Вещи] Меч (поединок)
+            value: alice-sounds-things-sword-3.opus
+          - label: 🚨 [Вещи] Сирена №1
             value: alice-sounds-things-siren-1.opus
-          - label: Магия (Magic)
-            value: alice-sounds-game-magic-1.opus
+          - label: 🚨 [Вещи] Сирена №2
+            value: alice-sounds-things-siren-2.opus
+          - label: ☎️ [Вещи] Старый телефон №1
+            value: alice-sounds-things-old-phone-1.opus
+          - label: ☎️ [Вещи] Старый телефон №2
+            value: alice-sounds-things-old-phone-2.opus
+          - label: 🪟 [Вещи] Стекло (разбивается)
+            value: alice-sounds-things-glass-1.opus
+          - label: 🔨 [Вещи] Строительство (отбойный молоток)
+            value: alice-sounds-things-construction-2.opus
+          - label: 🔨 [Вещи] Строительство (пила и молоток)
+            value: alice-sounds-things-construction-1.opus
+          - label: 📱 [Вещи] Телефон №1 (звонок)
+            value: alice-sounds-things-phone-1.opus
+          - label: 📱 [Вещи] Телефон №2 (звонок)
+            value: alice-sounds-things-phone-2.opus
+          - label: 📱 [Вещи] Телефон №3 (набор номера)
+            value: alice-sounds-things-phone-3.opus
+          - label: 📱 [Вещи] Телефон №4 (гудок)
+            value: alice-sounds-things-phone-4.opus
+          - label: 📱 [Вещи] Телефон №5 (гудок)
+            value: alice-sounds-things-phone-5.opus
+          - label: 🚽 [Вещи] Унитаз
+            value: alice-sounds-things-toilet-1.opus
+          - label: 🕰️ [Вещи] Часы с кукушкой №1
+            value: alice-sounds-things-cuckoo-clock-1.opus
+          - label: 🕰️ [Вещи] Часы с кукушкой №2
+            value: alice-sounds-things-cuckoo-clock-2.opus
+          - label: 🐺 [Животные] Волк
+            value: alice-sounds-animals-wolf-1.opus
+          - label: 🐦‍⬛ [Животные] Ворона №1
+            value: alice-sounds-animals-crow-1.opus
+          - label: 🐦‍⬛ [Животные] Ворона №2
+            value: alice-sounds-animals-crow-2.opus
+          - label: 🐄 [Животные] Корова №1
+            value: alice-sounds-animals-cow-1.opus
+          - label: 🐄 [Животные] Корова №2
+            value: alice-sounds-animals-cow-2.opus
+          - label: 🐄 [Животные] Корова №3
+            value: alice-sounds-animals-cow-3.opus
+          - label: 🐈 [Животные] Кошка №1 (мяуканье)
+            value: alice-sounds-animals-cat-1.opus
+          - label: 🐈 [Животные] Кошка №2 (мяуканье)
+            value: alice-sounds-animals-cat-2.opus
+          - label: 🐈 [Животные] Кошка №3 (мяуканье)
+            value: alice-sounds-animals-cat-3.opus
+          - label: 🐈 [Животные] Кошка №4 (мурчание)
+            value: alice-sounds-animals-cat-4.opus
+          - label: 🐈 [Животные] Кошка №5 (шипение)
+            value: alice-sounds-animals-cat-5.opus
+          - label: 🐦 [Животные] Кукушка
+            value: alice-sounds-animals-cuckoo-1.opus
+          - label: 🐔 [Животные] Курица
+            value: alice-sounds-animals-chicken-1.opus
+          - label: 🦁 [Животные] Лев №1
+            value: alice-sounds-animals-lion-1.opus
+          - label: 🦁 [Животные] Лев №2
+            value: alice-sounds-animals-lion-2.opus
+          - label: 🐎 [Животные] Лошадь №1 (ржание)
+            value: alice-sounds-animals-horse-1.opus
+          - label: 🐎 [Животные] Лошадь №2 (фырканье)
+            value: alice-sounds-animals-horse-2.opus
+          - label: 🐎 [Животные] Лошадь №3 (галоп)
+            value: alice-sounds-animals-horse-galloping-1.opus
+          - label: 🐎 [Животные] Лошадь №4 (шаг)
+            value: alice-sounds-animals-horse-walking-1.opus
+          - label: 🐸 [Животные] Лягушка
+            value: alice-sounds-animals-frog-1.opus
+          - label: 🐒 [Животные] Обезьяна
+            value: alice-sounds-animals-monkey-1.opus
+          - label: 🐑 [Животные] Овца №1
+            value: alice-sounds-animals-sheep-1.opus
+          - label: 🐑 [Животные] Овца №2 (несколько)
+            value: alice-sounds-animals-sheep-2.opus
+          - label: 🐓 [Животные] Петух
+            value: alice-sounds-animals-rooster-1.opus
+          - label: 🐘 [Животные] Слон №1
+            value: alice-sounds-animals-elephant-1.opus
+          - label: 🐘 [Животные] Слон №2
+            value: alice-sounds-animals-elephant-2.opus
+          - label: 🐕 [Животные] Собака №1 (лай)
+            value: alice-sounds-animals-dog-1.opus
+          - label: 🐕 [Животные] Собака №2 (рык)
+            value: alice-sounds-animals-dog-2.opus
+          - label: 🐕 [Животные] Собака №3 (скуление)
+            value: alice-sounds-animals-dog-3.opus
+          - label: 🐕 [Животные] Собака №4 (лай)
+            value: alice-sounds-animals-dog-4.opus
+          - label: 🐕 [Животные] Собака №5 (лай)
+            value: alice-sounds-animals-dog-5.opus
+          - label: 🦉 [Животные] Сова №1
+            value: alice-sounds-animals-owl-1.opus
+          - label: 🦉 [Животные] Сова №2
+            value: alice-sounds-animals-owl-2.opus
+          - label: 🕊️ [Животные] Чайки
+            value: alice-sounds-animals-seagull-1.opus
+          - label: 👾 [Игры] Загрузка (8 бит)
+            value: alice-sounds-game-boot-1.opus
+          - label: 🪙 [Игры] Монета (8 бит) №1
+            value: alice-sounds-game-8-bit-coin-1.opus
+          - label: 🪙 [Игры] Монета (8 бит) №2
+            value: alice-sounds-game-8-bit-coin-2.opus
+          - label: 📉 [Игры] Неудача №1
+            value: alice-sounds-game-loss-1.opus
+          - label: 📉 [Игры] Неудача №2
+            value: alice-sounds-game-loss-2.opus
+          - label: 📉 [Игры] Неудача №3
+            value: alice-sounds-game-loss-3.opus
+          - label: 🔔 [Игры] Оповещение (8 бит)
+            value: alice-sounds-game-ping-1.opus
+          - label: 🏆 [Игры] Победные фанфары №1
+            value: alice-sounds-game-win-1.opus
+          - label: 🏆 [Игры] Победные фанфары №2
+            value: alice-sounds-game-win-2.opus
+          - label: 🏆 [Игры] Победные фанфары №3
+            value: alice-sounds-game-win-3.opus
+          - label: 🚀 [Игры] Полет (8 бит)
+            value: alice-sounds-game-8-bit-flyby-1.opus
+          - label: 🔫 [Игры] Пулемет (8 бит)
+            value: alice-sounds-game-8-bit-machine-gun-1.opus
+          - label: ☎️ [Игры] Телефон (8 бит)
+            value: alice-sounds-game-8-bit-phone-1.opus
+          - label: ⭐ [Игры] Усиление (8 бит) №1
+            value: alice-sounds-game-powerup-1.opus
+          - label: ⭐ [Игры] Усиление (8 бит) №2
+            value: alice-sounds-game-powerup-2.opus
+          - label: 👏 [Люди] Аплодисменты
+            value: alice-sounds-human-cheer-1.opus
+          - label: 🙌 [Люди] Болельщики
+            value: alice-sounds-human-cheer-2.opus
+          - label: 👶 [Люди] Дети
+            value: alice-sounds-human-kids-1.opus
+          - label: 🧟 [Люди] Зомби №1 (рык)
+            value: alice-sounds-human-walking-dead-1.opus
+          - label: 🧟 [Люди] Зомби №2 (стон)
+            value: alice-sounds-human-walking-dead-2.opus
+          - label: 🧟 [Люди] Зомби №3 (рык с криком)
+            value: alice-sounds-human-walking-dead-3.opus
+          - label: 🤧 [Люди] Кашель №1
+            value: alice-sounds-human-cough-1.opus
+          - label: 🤧 [Люди] Кашель №2
+            value: alice-sounds-human-cough-2.opus
+          - label: 😆 [Люди] Смех №1
+            value: alice-sounds-human-laugh-1.opus
+          - label: 😆 [Люди] Смех №2
+            value: alice-sounds-human-laugh-2.opus
+          - label: 😈 [Люди] Смех №3 (злодейский)
+            value: alice-sounds-human-laugh-3.opus
+          - label: 😈 [Люди] Смех №4 (злодейский)
+            value: alice-sounds-human-laugh-4.opus
+          - label: 🧒 [Люди] Смех №5 (детский)
+            value: alice-sounds-human-laugh-5.opus
+          - label: 🗣️ [Люди] Толпа №1 (разговоры)
+            value: alice-sounds-human-crowd-1.opus
+          - label: 😯 [Люди] Толпа №2 (удивление)
+            value: alice-sounds-human-crowd-2.opus
+          - label: 👏 [Люди] Толпа №3 (аплодисменты)
+            value: alice-sounds-human-crowd-3.opus
+          - label: 🎉 [Люди] Толпа №4 (бурные аплодисменты)
+            value: alice-sounds-human-crowd-4.opus
+          - label: 📣 [Люди] Толпа №5 (болельщики)
+            value: alice-sounds-human-crowd-5.opus
+          - label: 👎 [Люди] Толпа №6 (недовольство)
+            value: alice-sounds-human-crowd-7.opus
+          - label: 👍 [Люди] Толпа №7 (одобрительные крики)
+            value: alice-sounds-human-crowd-6.opus
+          - label: 🤧 [Люди] Чихание №1
+            value: alice-sounds-human-sneeze-1.opus
+          - label: 🤧 [Люди] Чихание №2
+            value: alice-sounds-human-sneeze-2.opus
+          - label: 👣 [Люди] Шаги в комнате
+            value: alice-sounds-human-walking-room-1.opus
+          - label: ❄️ [Люди] Шаги на снегу
+            value: alice-sounds-human-walking-snow-1.opus
+          - label: 🍂 [Люди] Шаги по листьям
+            value: alice-sounds-human-walking-leaves-1.opus
+          - label: 🪕 [Музыка] Арфа
+            value: alice-music-harp-1.opus
+          - label: 🥁 [Музыка] Барабанный проигрыш №1
+            value: alice-music-drums-1.opus
+          - label: 🥁 [Музыка] Барабанный проигрыш №2
+            value: alice-music-drums-2.opus
+          - label: 🥁 [Музыка] Барабанный проигрыш №3
+            value: alice-music-drums-3.opus
+          - label: 🎶 [Музыка] Бит №1 (быстро)
+            value: alice-music-drum-loop-1.opus
+          - label: 🎶 [Музыка] Бит №2 (медленно)
+            value: alice-music-drum-loop-2.opus
+          - label: 🪇 [Музыка] Бубен №1 (80 bpm)
+            value: alice-music-tambourine-80bpm-1.opus
+          - label: 🪇 [Музыка] Бубен №2 (100 bpm)
+            value: alice-music-tambourine-100bpm-1.opus
+          - label: 🪇 [Музыка] Бубен №3 (120 bpm)
+            value: alice-music-tambourine-120bpm-1.opus
+          - label: 🎺 [Музыка] Волынка №1
+            value: alice-music-bagpipes-1.opus
+          - label: 🎺 [Музыка] Волынка №2
+            value: alice-music-bagpipes-2.opus
+          - label: 🎸 [Музыка] Гитара, аккорд C
+            value: alice-music-guitar-c-1.opus
+          - label: 🎸 [Музыка] Гитара, аккорд E
+            value: alice-music-guitar-e-1.opus
+          - label: 🎸 [Музыка] Гитара, аккорд G
+            value: alice-music-guitar-g-1.opus
+          - label: 🎸 [Музыка] Гитара, аккорд А
+            value: alice-music-guitar-a-1.opus
+          - label: 🪘 [Музыка] Гонг №1
+            value: alice-music-gong-1.opus
+          - label: 🪘 [Музыка] Гонг №2
+            value: alice-music-gong-2.opus
+          - label: 📯 [Музыка] Горн
+            value: alice-music-horn-2.opus
+          - label: 🎻 [Музыка] Скрипка (до)
+            value: alice-music-violin-c-1.opus
+          - label: 🎻 [Музыка] Скрипка (до верхнее)
+            value: alice-music-violin-c-2.opus
+          - label: 🎻 [Музыка] Скрипка (ля)
+            value: alice-music-violin-a-1.opus
+          - label: 🎻 [Музыка] Скрипка (ми)
+            value: alice-music-violin-e-1.opus
+          - label: 🎻 [Музыка] Скрипка (ре)
+            value: alice-music-violin-d-1.opus
+          - label: 🎻 [Музыка] Скрипка (си)
+            value: alice-music-violin-b-1.opus
+          - label: 🎻 [Музыка] Скрипка (соль)
+            value: alice-music-violin-g-1.opus
+          - label: 🎻 [Музыка] Скрипка (фа)
+            value: alice-music-violin-f-1.opus
+          - label: 📣 [Музыка] Труба болельщика
+            value: alice-music-horn-1.opus
+          - label: 🎹 [Музыка] Фортепиано (до)
+            value: alice-music-piano-c-1.opus
+          - label: 🎹 [Музыка] Фортепиано (до верхнее)
+            value: alice-music-piano-c-2.opus
+          - label: 🎹 [Музыка] Фортепиано (ля)
+            value: alice-music-piano-a-1.opus
+          - label: 🎹 [Музыка] Фортепиано (ми)
+            value: alice-music-piano-e-1.opus
+          - label: 🎹 [Музыка] Фортепиано (ре)
+            value: alice-music-piano-d-1.opus
+          - label: 🎹 [Музыка] Фортепиано (си)
+            value: alice-music-piano-b-1.opus
+          - label: 🎹 [Музыка] Фортепиано (соль)
+            value: alice-music-piano-g-1.opus
+          - label: 🎹 [Музыка] Фортепиано (фа)
+            value: alice-music-piano-f-1.opus
+          - label: 🌬️ [Природа] Ветер №1
+            value: alice-sounds-nature-wind-1.opus
+          - label: 🌬️ [Природа] Ветер №2
+            value: alice-sounds-nature-wind-2.opus
+          - label: 🌩️ [Природа] Гром №1
+            value: alice-sounds-nature-thunder-1.opus
+          - label: 🌩️ [Природа] Гром №2
+            value: alice-sounds-nature-thunder-2.opus
+          - label: 🌴 [Природа] Джунгли №1
+            value: alice-sounds-nature-jungle-1.opus
+          - label: 🌴 [Природа] Джунгли №2
+            value: alice-sounds-nature-jungle-2.opus
+          - label: 🌧️ [Природа] Дождь №1
+            value: alice-sounds-nature-rain-1.opus
+          - label: 🌧️ [Природа] Дождь №2
+            value: alice-sounds-nature-rain-2.opus
+          - label: 🌲 [Природа] Лес №1
+            value: alice-sounds-nature-forest-1.opus
+          - label: 🌲 [Природа] Лес №2
+            value: alice-sounds-nature-forest-2.opus
+          - label: 🌊 [Природа] Море №1
+            value: alice-sounds-nature-sea-1.opus
+          - label: 🌊 [Природа] Море №2
+            value: alice-sounds-nature-sea-2.opus
+          - label: 🔥 [Природа] Огонь №1
+            value: alice-sounds-nature-fire-1.opus
+          - label: 🔥 [Природа] Огонь №2
+            value: alice-sounds-nature-fire-2.opus
+          - label: 🏞️ [Природа] Ручей №1
+            value: alice-sounds-nature-stream-1.opus
+          - label: 🏞️ [Природа] Ручей №2
+            value: alice-sounds-nature-stream-2.opus
 sequence:
   - variables:
       compiled_message: |-

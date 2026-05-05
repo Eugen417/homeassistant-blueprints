@@ -1,6 +1,6 @@
 alias: "Алиса: Умный рупор TTS"
 description: >
-  v3.0 Визуальный Интерфейс настройки TTS уведомлений для Яндекс станций. Полная
+  v3.5 Визуальный Интерфейс настройки TTS уведомлений для Яндекс станций. Полная
   база звуков, эффектов и поддержка пользовательских аудиофайлов. Cкрипт для
   Yandex.Station(Визуальный Интерфейс настройки TTS уведомлений для Яндекс
   станций)после его установки, в Автоматизациях выбирая этот скрипт в блоке:
@@ -422,26 +422,46 @@ fields:
             value: alice-sounds-nature-stream-2.opus
 sequence:
   - variables:
+      safe_vol: "{{ volume_level | default(0.5) | float }}"
+      safe_restore: "{{ restore_volume_level | default(0) | float }}"
+      safe_prefix: "{{ prefix_sound | default('') }}"
+      safe_voice: "{{ voice | default('') }}"
+      safe_effect: "{{ effect | default('') }}"
+      safe_whisper: "{{ is_whisper | default(false) | bool }}"
+      current_vol: "{{ state_attr(target_station, 'volume_level') | float(0.4) }}"
+      final_vol: "{{ safe_restore if safe_restore > 0 else current_vol }}"
       compiled_message: |-
         {% set tags = [] %}
-        {% if prefix_sound != "" %}
-          {% set tags = tags + ['<speaker audio="' ~ prefix_sound ~ '">'] %}
+        {% if safe_prefix != "" %}
+          {% set tags = tags + ['<speaker audio="' ~ safe_prefix ~ '">'] %}
         {% endif %}
-        {% if voice != "" %}
-          {% set tags = tags + ['<speaker voice="' ~ voice ~ '">'] %}
+        {% if safe_voice != "" %}
+          {% set tags = tags + ['<speaker voice="' ~ safe_voice ~ '">'] %}
         {% endif %}
-        {% if effect != "" %}
-          {% set tags = tags + ['<speaker effect="' ~ effect ~ '">'] %}
+        {% if safe_effect != "" %}
+          {% set tags = tags + ['<speaker effect="' ~ safe_effect ~ '">'] %}
         {% endif %}
-        {% if is_whisper %}
+        {% if safe_whisper %}
           {% set tags = tags + ['<speaker is_whisper="true">'] %}
         {% endif %}
         {{ tags | join(' ') }} {{ message }}
+  - action: media_player.volume_set
+    target:
+      entity_id: "{{ target_station }}"
+    data:
+      volume_level: "{{ safe_vol }}"
+  - delay: "00:00:00.5"
   - action: tts.yandex_station_say
     target:
       entity_id: "{{ target_station }}"
     data:
       message: "{{ compiled_message }}"
-      options:
-        volume_level: "{{ volume_level }}"
+      cache: false
+  - delay:
+      seconds: "{{ (message | length * 0.13) | int + 5 }}"
+  - action: media_player.volume_set
+    target:
+      entity_id: "{{ target_station }}"
+    data:
+      volume_level: "{{ final_vol }}"
 max: 10

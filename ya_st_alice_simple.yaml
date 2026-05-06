@@ -1,7 +1,8 @@
-alias: "Алиса: Умный рупор TTS"
+alias: "Алиса: Умный рупор Multi TTS+Play Media"
 description: >
-  v3.5 Визуальный Интерфейс настройки TTS уведомлений для Яндекс станций. Полная
-  база звуков, эффектов и поддержка пользовательских аудиофайлов. Cкрипт для
+  v4.0 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
+  громкости,  база звуков, выбор метода отправки (tts / play_media). Полная база
+  звуков, эффектов и поддержка пользовательских аудиофайлов. Cкрипт для
   Yandex.Station(Визуальный Интерфейс настройки TTS уведомлений для Яндекс
   станций)после его установки, в Автоматизациях выбирая этот скрипт в блоке:
   Тогда Появляется человеческий интерфейс настройки использующий под капотом:
@@ -19,12 +20,26 @@ mode: queued
 fields:
   target_station:
     name: Колонка
-    description: Выберите колонку для воспроизведения
+    description: Выберите одну или несколько колонок (кликните в поле ниже)
     required: true
     selector:
       entity:
         domain: media_player
         integration: yandex_station
+        multiple: true
+  method:
+    name: Метод отправки
+    description: >-
+      play_media - Алиса сразу замолкает. tts - классический метод. Выберите
+      play_media, если колонка воспринимает TTS как команду.
+    default: play_media
+    selector:
+      select:
+        options:
+          - label: Play Media (Без режима команд)
+            value: play_media
+          - label: TTS (Классический)
+            value: tts
   message:
     name: Сообщение
     description: Текст для озвучивания
@@ -33,13 +48,24 @@ fields:
       text:
         multiline: true
   volume_level:
-    name: Громкость
-    description: Уровень громкости произношения (0.1 - тихо, 1.0 - максимум)
+    name: Громкость уведомления
+    description: Уровень громкости (0.1 - тихо, 1.0 - максимум). Оставьте 0 для текущей.
     required: true
     default: 0.5
     selector:
       number:
-        min: 0.1
+        min: 0
+        max: 1
+        step: 0.1
+        mode: slider
+  restore_volume_level:
+    name: Громкость возврата
+    description: Громкость после прочтения (0 - умно вернуть ту, что была у КАЖДОЙ колонки)
+    required: true
+    default: 0
+    selector:
+      number:
+        min: 0
         max: 1
         step: 0.1
         mode: slider
@@ -422,14 +448,26 @@ fields:
             value: alice-sounds-nature-stream-2.opus
 sequence:
   - variables:
+      stations: |-
+        {% if target_station is string %}
+          {{ [target_station] }}
+        {% elif target_station is iterable %}
+          {{ target_station | list }}
+        {% else %}
+          []
+        {% endif %}
       safe_vol: "{{ volume_level | default(0.5) | float }}"
       safe_restore: "{{ restore_volume_level | default(0) | float }}"
+      safe_method: "{{ method | default('play_media') }}"
       safe_prefix: "{{ prefix_sound | default('') }}"
       safe_voice: "{{ voice | default('') }}"
       safe_effect: "{{ effect | default('') }}"
       safe_whisper: "{{ is_whisper | default(false) | bool }}"
-      current_vol: "{{ state_attr(target_station, 'volume_level') | float(0.4) }}"
-      final_vol: "{{ safe_restore if safe_restore > 0 else current_vol }}"
+      original_volumes: |-
+        {% set ns = namespace(v={}) %} {% for s in stations %}
+          {% set vol = state_attr(s, 'volume_level') | float(0.4) %}
+          {% set ns.v = dict(ns.v, **{s: vol}) %}
+        {% endfor %} {{ dict(ns.v) }}
       compiled_message: |-
         {% set tags = [] %}
         {% if safe_prefix != "" %}
@@ -447,21 +485,37 @@ sequence:
         {{ tags | join(' ') }} {{ message }}
   - action: media_player.volume_set
     target:
-      entity_id: "{{ target_station }}"
+      entity_id: "{{ stations }}"
     data:
       volume_level: "{{ safe_vol }}"
   - delay: "00:00:00.5"
-  - action: tts.yandex_station_say
-    target:
-      entity_id: "{{ target_station }}"
-    data:
-      message: "{{ compiled_message }}"
-      cache: false
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ safe_method == 'tts' }}"
+        sequence:
+          - action: tts.yandex_station_say
+            target:
+              entity_id: "{{ stations }}"
+            data:
+              message: "{{ compiled_message }}"
+              cache: false
+    default:
+      - action: media_player.play_media
+        target:
+          entity_id: "{{ stations }}"
+        data:
+          media_content_id: "{{ compiled_message }}"
+          media_content_type: text
   - delay:
       seconds: "{{ (message | length * 0.13) | int + 5 }}"
-  - action: media_player.volume_set
-    target:
-      entity_id: "{{ target_station }}"
-    data:
-      volume_level: "{{ final_vol }}"
-max: 10
+  - repeat:
+      for_each: "{{ stations }}"
+      sequence:
+        - action: media_player.volume_set
+          target:
+            entity_id: "{{ repeat.item }}"
+          data:
+            volume_level: >-
+              {{ safe_restore if safe_restore > 0 else
+              original_volumes.get(repeat.item, 0.4) }}

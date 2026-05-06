@@ -1,9 +1,9 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.4.3"
+  name: "Уведомление Прогноз о метео + Карта v1.6.0"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
-    Поддерживает Telegram (HTML) и универсальную отправку для VK/Max.
-    💡 Для VK/Max используйте короткие ссылки (vk.cc).
+    Поддерживает Telegram (HTML), Max Notify (HTML) и VK (Plain Text).
+    💡 Для VK рекомендуется использовать короткие ссылки (vk.cc).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
   
@@ -15,7 +15,7 @@ blueprint:
       selector:
         entity:
           domain: weather
-    
+          
     trigger_time:
       name: "Время отправки"
       default: "07:00:00"
@@ -32,9 +32,19 @@ blueprint:
           entity:
             - domain: notify
 
-    plain_notify_target:
-      name: "💬 Уведомления VK / Max Notify"
-      description: "Выберите сущности VK Notify и/или Max Notify. Можно выбрать сразу несколько из разных сервисов."
+    vk_notify_target:
+      name: "💬 Уведомления VK Notify"
+      description: "Выберите сущности VK Notify. Отправка будет без HTML-тегов."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+
+    max_notify_target:
+      name: "💬 Уведомления Max Notify"
+      description: "Выберите сущности Max Notify. Отправка в формате HTML."
       default:
         entity_id: []
       selector:
@@ -101,7 +111,8 @@ blueprint:
 variables:
   weather_entity: !input weather_entity
   telegram_notify_target: !input telegram_notify_target
-  plain_notify_target: !input plain_notify_target
+  vk_notify_target: !input vk_notify_target
+  max_notify_target: !input max_notify_target
   map_link: !input map_url
   
   # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ---
@@ -121,8 +132,12 @@ variables:
     {% endfor %}
     {{ ns.target_ids }}
 
-  plain_targets: >-
-    {% set raw = plain_notify_target.entity_id | default([]) %}
+  vk_targets: >-
+    {% set raw = vk_notify_target.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+
+  max_targets: >-
+    {% set raw = max_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
 
   # Переменные текстов
@@ -147,7 +162,7 @@ trigger:
 action:
   - if:
       - condition: template
-        value_template: "{{ (target_chat_ids | length == 0) and (plain_targets | length == 0) }}"
+        value_template: "{{ (target_chat_ids | length == 0) and (vk_targets | length == 0) and (max_targets | length == 0) }}"
     then:
       - stop: "Не выбраны получатели ни для одной из платформ"
 
@@ -171,7 +186,7 @@ action:
         {%- if t < limit_cold -%}🥶 Бррр, дубак!{%- elif t < 0 -%}❄️ Морозно{%- else -%}☀️ Хорошая погода{%- endif -%}
         {%- endif -%}
 
-      # --- ВЕРСИЯ ДЛЯ TELEGRAM (HTML) ---
+      # --- ВЕРСИЯ ДЛЯ TELEGRAM И MAX (HTML) ---
       msg_text_html: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
@@ -224,7 +239,7 @@ action:
         <a href="{{ map_link }}">🗺 Открыть карту осадков</a>
         {%- endif %}
 
-      # --- ВЕРСИЯ ДЛЯ VK, MAX И ПРОЧИХ (PLAIN TEXT) ---
+      # --- ВЕРСИЯ ДЛЯ VK (PLAIN TEXT) ---
       msg_text_plain: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
@@ -257,7 +272,7 @@ action:
         {%- endfor %}
 
         {% set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) | list | count > 0 %}
-        {%- if has_rain %}{{ adv_umbrella | striptags }}{% else %}{{ adv_warm | striptags }}{% endif %}
+        {%- if has_rain %}{{ adv_umbrella | replace('<b>', '') | replace('</b>', '') }}{% else %}{{ adv_warm | replace('<b>', '') | replace('</b>', '') }}{% endif %}
         {%- else %}
         {%- set current = forecast[0] %}
         Доброе утро!
@@ -265,11 +280,11 @@ action:
         Сейчас на улице: {{ current.temperature }}°C.
 
         {% if current.temperature < limit_cold %}
-        {{ adv_freeze | striptags }}
+        {{ adv_freeze | replace('<b>', '') | replace('</b>', '') }}
         {%- elif current.temperature < -5 %}
-        {{ adv_cool | striptags }}
+        {{ adv_cool | replace('<b>', '') | replace('</b>', '') }}
         {%- else %}
-        {{ adv_good | striptags }}
+        {{ adv_good | replace('<b>', '') | replace('</b>', '') }}
         {%- endif %}
         {%- endif %}
         {%- if map_link != '' %}
@@ -278,6 +293,8 @@ action:
         {%- endif %}
 
   # --- БЛОКИ ОТПРАВКИ ---
+  
+  # 1. Telegram
   - if:
       - condition: template
         value_template: "{{ target_chat_ids | length > 0 }}"
@@ -289,13 +306,26 @@ action:
           title: "{{ msg_title }}"
           message: "{{ msg_text_html }}"
 
+  # 2. VK Notify
   - if:
       - condition: template
-        value_template: "{{ plain_targets | length > 0 }}"
+        value_template: "{{ vk_targets | length > 0 }}"
     then:
       - action: notify.send_message
         target:
-          entity_id: "{{ plain_targets }}"
+          entity_id: "{{ vk_targets }}"
         data:
           title: "{{ msg_title }}"
           message: "{{ msg_text_plain }}"
+
+  # 3. Max Notify
+  - if:
+      - condition: template
+        value_template: "{{ max_targets | length > 0 }}"
+    then:
+      - action: notify.send_message
+        target:
+          entity_id: "{{ max_targets }}"
+        data:
+          title: "{{ msg_title }}"
+          message: "{{ msg_text_html }}"

@@ -1,6 +1,6 @@
 alias: "Алиса: Умный рупор Multi TTS+Play Media"
 description: >
-  v4.0 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
+  v4.1 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
   громкости,  база звуков, выбор метода отправки (tts / play_media). Полная база
   звуков, эффектов и поддержка пользовательских аудиофайлов. Cкрипт для
   Yandex.Station(Визуальный Интерфейс настройки TTS уведомлений для Яндекс
@@ -68,6 +68,19 @@ fields:
         min: 0
         max: 1
         step: 0.1
+        mode: slider
+  extra_delay:
+    name: Дополнительная пауза (сек)
+    description: >-
+      Дополнительное время ожидания перед возвратом громкости (на случай длинных
+      звуков)
+    required: true
+    default: 5
+    selector:
+      number:
+        min: 0
+        max: 60
+        step: 1
         mode: slider
   voice:
     name: Голос
@@ -458,6 +471,7 @@ sequence:
         {% endif %}
       safe_vol: "{{ volume_level | default(0.5) | float }}"
       safe_restore: "{{ restore_volume_level | default(0) | float }}"
+      safe_delay_extra: "{{ extra_delay | default(5) | int }}"
       safe_method: "{{ method | default('play_media') }}"
       safe_prefix: "{{ prefix_sound | default('') }}"
       safe_voice: "{{ voice | default('') }}"
@@ -505,10 +519,12 @@ sequence:
         target:
           entity_id: "{{ stations }}"
         data:
-          media_content_id: "{{ compiled_message }}"
-          media_content_type: text
+          media:
+            media_content_id: "{{ compiled_message }}"
+            media_content_type: text
+            metadata: {}
   - delay:
-      seconds: "{{ (message | length * 0.13) | int + 5 }}"
+      seconds: "{{ (message | length * 0.13) | int + safe_delay_extra }}"
   - repeat:
       for_each: "{{ stations }}"
       sequence:
@@ -519,3 +535,4 @@ sequence:
             volume_level: >-
               {{ safe_restore if safe_restore > 0 else
               original_volumes.get(repeat.item, 0.4) }}
+max: 10

@@ -162,6 +162,10 @@ action:
           {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %} 
           {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %} 
           {% set fc = weather_data[weather_entity].forecast %} 
+          {% set t_current = fc[0].temperature %}
+          {% set temps = fc[:24] | map(attribute='temperature') | list %}
+          {% set t_min = temps | min %}
+          {% set t_max = temps | max %}
           {% set ns = namespace(future=[], blocks=[], current_block=[], count=0, out="") %} 
           {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
             {% if ns.count < 24 %}
@@ -179,13 +183,24 @@ action:
             {% endif %}
           {% endfor %} 
           {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
+          
           {% if ns.blocks | count > 0 %}
-            {% set ns.out = "<b>Доброе утро!</b> ☕️\nПрогноз осадков на ближайшие 24 часа:\n" %}
+            {% set ns.out = "<b>Доброе утро!</b> ☕️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\n<b>Внимание, ожидаются осадки (24ч):</b>\n" %}
             {% set ns.min_temp = 50 %}
             {% for block in ns.blocks %}
               {% set start, end = block[0], block[-1] %}
               {% if start.temperature | float < ns.min_temp %}{% set ns.min_temp = start.temperature | float %}{% endif %}
-              {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ ((as_timestamp(end.datetime, 0) + 3600) | timestamp_custom('%H:%M')) %}
+              
+              {% set now_day = as_timestamp(now(), 0) | timestamp_custom('%d') %}
+              {% set hour_day = as_timestamp(start.datetime, 0) | timestamp_custom('%d') %}
+              {% set day_text = ' (завтра)' if now_day != hour_day else '' %}
+
+              {% if start == end %}
+                {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ day_text %}
+              {% else %}
+                {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ ((as_timestamp(end.datetime, 0) + 3600) | timestamp_custom('%H:%M')) ~ day_text %}
+              {% endif %}
+              
               {% set ns.out = ns.out ~ "🕒 <b>" ~ t_range ~ "</b> — " ~ mapper.get(start.condition, start.condition) ~ " (" ~ start.temperature ~ "°C)\n" %}
             {% endfor %}
             
@@ -195,7 +210,7 @@ action:
               {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
             {% endif %}
           {% else %}
-            {% set ns.out = "<b>Доброе утро!</b> ☀️\nВ ближайшие 24 часа осадков не ожидается. Хорошего дня!" %}
+            {% set ns.out = "<b>Доброе утро!</b> ☀️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\nВ ближайшие 24 часа осадков не ожидается. Хорошего дня!" %}
           {% endif %} {{ ns.out | trim }}
         vk_kb: "{% if map_link != '' %} {\"inline\": true, \"buttons\": [[{\"action\":
           {\"type\": \"open_link\", \"link\": \"{{ map_link }}\", \"label\": \"🗺
@@ -268,6 +283,7 @@ action:
           {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %} 
           {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %} 
           {% set fc = weather_data[weather_entity].forecast %} 
+          {% set t_current = fc[0].temperature %}
           {% set ns = namespace(out="", count=0, min_temp=50) %} 
           {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
             {% if ns.count < 3 %}
@@ -279,6 +295,7 @@ action:
             {% endif %}
           {% endfor %}
           {% if ns.out != "" %}
+            {% set ns.out = "🌡 Сейчас: <b>" ~ t_current ~ "°C</b>\n\n" ~ ns.out %}
             {% if ns.min_temp <= 7 %}
               {% set ns.out = ns.out ~ "\n🥶 <b>Холодно и сыро.</b> Надеюсь, вы тепло одеты и зонт с вами!" %}
             {% else %}
@@ -362,7 +379,7 @@ action:
               continue_on_error: true
               data:
                 entity_id: '{{ vk_target }}'
-                message: "<b>✅ Оперативный мониторинг</b>\nОсадков в ближайшие 3 часа не ожидается. Небо прояснилось! 🌤\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                message: "<b>✅ Оперативный мониторинг</b>\nОсадков в ближайшие 3 часа не ожидается. Небо прояснилось! 🌤\n🌡 Сейчас: <b>{{ weather_data[weather_entity].forecast[0].temperature }}°C</b>\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
                 conversation_message_id: '{{ p_id | int(0) }}'
                 keyboard:
                   inline: true

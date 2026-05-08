@@ -1,6 +1,6 @@
 alias: "Алиса: Умный рупор Multi TTS+Play Media"
 description: >
-  v4.5 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
+  v4.6 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
   громкости, база звуков, выбор метода отправки (Произнести текст / Выполнить
   команду). Умные стратегии громкости (проверка воспроизведения медиа, защита от
   скачков). Полная база звуков и эффектов. Установка скрипта: Идем в Настройки >
@@ -24,15 +24,17 @@ fields:
     name: Режим работы
     description: >-
       Выберите, что должна сделать колонка: просто сказать текст или выполнить
-      его как команду (например, 'выключи свет').
+      его как команду.
     default: play_media
     selector:
       select:
         options:
           - label: 🗣️ Произнести текст (Надежный)
             value: play_media
-          - label: ⚙️ Выполнить команду
+          - label: ⚙️ Тихая команда (без смены громкости)
             value: command
+          - label: 🎶 Команда на музыку (установит громкость, без возврата)
+            value: command_media
           - label: 🎙️ Классический TTS
             value: tts
   message:
@@ -542,8 +544,8 @@ sequence:
   - if:
       - condition: template
         value_template: >-
-          {{ safe_method != 'command' and (stations_to_change_vol | length > 0)
-          }}
+          {{ safe_method in ['play_media', 'tts', 'command_media'] and
+          (stations_to_change_vol | length > 0) }}
     then:
       - action: media_player.volume_set
         target:
@@ -564,24 +566,28 @@ sequence:
               cache: false
       - conditions:
           - condition: template
-            value_template: "{{ safe_method == 'command' }}"
+            value_template: "{{ safe_method in ['command', 'command_media'] }}"
         sequence:
           - action: media_player.play_media
             target:
               entity_id: "{{ stations }}"
             data:
-              media_content_id: "{{ message }}"
-              media_content_type: command
+              media:
+                media_content_id: "{{ message }}"
+                media_content_type: command
+                metadata: {}
     default:
       - action: media_player.play_media
         target:
           entity_id: "{{ stations }}"
         data:
-          media_content_id: "{{ compiled_message }}"
-          media_content_type: text
+          media:
+            media_content_id: "{{ compiled_message }}"
+            media_content_type: text
+            metadata: {}
   - if:
       - condition: template
-        value_template: "{{ safe_method != 'command' }}"
+        value_template: "{{ safe_method in ['play_media', 'tts'] }}"
     then:
       - delay:
           seconds: "{{ (message | length * 0.13) | int + safe_delay_extra }}"

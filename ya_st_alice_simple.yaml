@@ -1,16 +1,20 @@
-alias: "Алиса: Умный рупор Multi TTS+Play Media"
-description: >
-  v4.6 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
-  громкости, база звуков, выбор метода отправки (Произнести текст / Выполнить
-  команду). Умные стратегии громкости (проверка воспроизведения медиа, защита от
-  скачков). Полная база звуков и эффектов. Установка скрипта: Идем в Настройки >
-  Автоматизации и сцены > Скрипты, создаём новый скрипт,  переключаемся в
-  текстовый редактор и вставляем код как есть. Готово! Использование: В
-  автоматизации в блоке "Тогда" выбираем "Выполнить действие",  находим скрипт
-  "Алиса: Умный рупор" и настраиваем интерфейс.
-source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/ya_st_alice_simple.yaml
+blueprint:
+  name: "Алиса: Умный рупор Multi TTS+Play Media"
+  description: >
+    v4.6 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
+    громкости, база звуков, выбор метода отправки (Произнести текст / Выполнить
+    команду). Умные стратегии громкости (проверка воспроизведения медиа, защита от
+    скачков). Полная база звуков и эффектов. 
+    
+    **Использование:** После сохранения этого блюпринта в виде скрипта, в любой вашей автоматизации в блоке "Тогда" выберите "Выполнить действие", находите ваш скрипт "Алиса: Умный рупор" и настраивайте удобный визуальный интерфейс!
+  domain: script
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/ya_st_alice_simple.yaml
+  input: {}
+
 icon: mdi:account-voice
 mode: queued
+max: 10
+
 fields:
   target_station:
     name: Колонка
@@ -474,6 +478,7 @@ fields:
             value: alice-sounds-nature-stream-1.opus
           - label: 🏞️ [Природа] Ручей №2
             value: alice-sounds-nature-stream-2.opus
+
 sequence:
   - variables:
       stations: |-
@@ -542,6 +547,7 @@ sequence:
           {% set tags = tags + ['<speaker is_whisper="true">'] %}
         {% endif %}
         {{ tags | join(' ') }} {{ message }}
+
   - if:
       - condition: template
         value_template: >-
@@ -554,6 +560,7 @@ sequence:
         data:
           volume_level: "{{ safe_vol }}"
       - delay: "00:00:00.5"
+
   - choose:
       - conditions:
           - condition: template
@@ -573,19 +580,16 @@ sequence:
             target:
               entity_id: "{{ stations }}"
             data:
-              media:
-                media_content_id: "{{ message }}"
-                media_content_type: command
-                metadata: {}
+              media_content_id: "{{ message }}"
+              media_content_type: command
     default:
       - action: media_player.play_media
         target:
           entity_id: "{{ stations }}"
         data:
-          media:
-            media_content_id: "{{ compiled_message }}"
-            media_content_type: text
-            metadata: {}
+          media_content_id: "{{ compiled_message }}"
+          media_content_type: text
+
   - if:
       - condition: template
         value_template: "{{ safe_method in ['play_media', 'tts'] }}"
@@ -611,4 +615,3 @@ sequence:
                     entity_id: "{{ repeat.item }}"
                   data:
                     volume_level: "{{ target_rest_vol }}"
-max: 10

@@ -1,4 +1,4 @@
-id: homeassistant_person_tracker_telegram_v1.6
+#id: homeassistant_person_tracker_telegram_v1.6
 blueprint:
   name: 🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.6
   description: |

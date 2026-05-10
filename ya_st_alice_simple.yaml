@@ -1,10 +1,12 @@
 blueprint:
   name: "Алиса: Умный рупор Multi TTS+Play Media"
   description: >
-    v4.6 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
+    v4.7 Cкрипт уведомлений. Мульти-выбор колонок с сохранением индивидуальной
     громкости, база звуков, выбор метода отправки (Произнести текст / Выполнить
     команду). Умные стратегии громкости (проверка воспроизведения медиа, защита от
-    скачков). Полная база звуков и эффектов. 
+    скачков). Полная база звуков и эффектов.
+    
+    > ⚠️ **ВНИМАНИЕ:** Если в предыдущих автоматизациях, использующих этот скрипт, был настроен Шёпот, то удалите из кода часть is_whisper: false и настройте шёпот повторно в разделе эффекты.
     
     **Использование:** После сохранения этого блюпринта в виде скрипта, в любой вашей автоматизации в блоке "Тогда" выберите "Выполнить действие", находите ваш скрипт "Алиса: Умный рупор" и настраивайте удобный визуальный интерфейс!
   domain: script
@@ -44,7 +46,10 @@ fields:
             value: tts
   message:
     name: Сообщение
-    description: Текст для озвучивания или текст команды
+    description: >-
+      Текст для озвучивания или текст команды. Также можно использовать SSML-теги 
+      для наложения разных эффектов в рамках одного сообщения. 
+      Пример: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
     required: true
     selector:
       text:
@@ -126,28 +131,24 @@ fields:
     selector:
       select:
         options:
-          - label: Без эффекта
+          - label: ❌ Без эффекта
             value: ""
-          - label: Голос из-за стены
+          - label: 🤫 Шёпот
+            value: whisper
+          - label: 🧱 Голос из-за стены
             value: behind_the_wall
-          - label: Голос хомяка
+          - label: 🐹 Голос хомяка
             value: hamster
-          - label: Мегафон
+          - label: 📣 Мегафон
             value: megaphone
-          - label: Низкий голос
+          - label: 👹 Низкий голос
             value: pitch_down
-          - label: Психоделический
+          - label: 🌀 Психоделический
             value: psychodelic
-          - label: С прерываниями
+          - label: 💓 С прерываниями
             value: pulse
-          - label: Громкоговоритель на вокзале
+          - label: 🚉 Громкоговоритель на вокзале
             value: train_announce
-  is_whisper:
-    name: Шёпот
-    description: Произнести фразу шёпотом
-    default: false
-    selector:
-      boolean: {}
   prefix_sound:
     name: Звук перед фразой
     description: Выберите из списка или вставьте свой ID (dialogs-upload/...)
@@ -497,7 +498,6 @@ sequence:
       safe_prefix: "{{ prefix_sound | default('') }}"
       safe_voice: "{{ voice | default('') }}"
       safe_effect: "{{ effect | default('') }}"
-      safe_whisper: "{{ is_whisper | default(false) | bool }}"
       original_volumes: |-
         {% set ns = namespace(v={}) %} {% for s in stations %}
           {% set vol = state_attr(s, 'volume_level') | float(0.4) %}
@@ -540,11 +540,10 @@ sequence:
         {% if safe_voice != "" %}
           {% set tags = tags + ['<speaker voice="' ~ safe_voice ~ '">'] %}
         {% endif %}
-        {% if safe_effect != "" %}
-          {% set tags = tags + ['<speaker effect="' ~ safe_effect ~ '">'] %}
-        {% endif %}
-        {% if safe_whisper %}
+        {% if safe_effect == 'whisper' %}
           {% set tags = tags + ['<speaker is_whisper="true">'] %}
+        {% elif safe_effect != "" %}
+          {% set tags = tags + ['<speaker effect="' ~ safe_effect ~ '">'] %}
         {% endif %}
         {{ tags | join(' ') }} {{ message }}
 

@@ -1,4 +1,4 @@
-id: homeassistant_script_alisa_umnyi_rupor_v4.7
+# id: homeassistant_script_alisa_umnyi_rupor_v4.7
 blueprint:
   name: "Алиса: Умный рупор Multi TTS+Play Media"
   description: >

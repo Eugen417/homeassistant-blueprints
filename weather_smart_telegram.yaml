@@ -1,9 +1,8 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.6.2"
+  name: "Уведомление Прогноз о метео + Карта v1.7"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
-    Поддерживает Telegram (HTML), Max Notify (HTML) и VK (Plain Text).
-    💡 Для VK рекомендуется использовать короткие ссылки (vk.cc).
+    Поддерживает Telegram, Max Notify и VK Notify (теперь с полной поддержкой HTML и кликабельных ссылок!).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/weather_smart_telegram.yaml
  
@@ -34,7 +33,7 @@ blueprint:
 
     vk_notify_target:
       name: "💬 Уведомления VK Notify"
-      description: "Выберите сущности VK Notify. Отправка будет без HTML-тегов."
+      description: "Выберите сущности VK Notify. (Используется HTML-разметка)"
       default:
         entity_id: []
       selector:
@@ -44,7 +43,7 @@ blueprint:
 
     max_notify_target:
       name: "💬 Уведомления Max Notify"
-      description: "Выберите сущности Max Notify. Отправка в формате HTML."
+      description: "Выберите сущности Max Notify. (Используется HTML-разметка)"
       default:
         entity_id: []
       selector:
@@ -186,7 +185,7 @@ action:
         {%- if t < limit_cold -%}🥶 Бррр, дубак!{%- elif t < 0 -%}❄️ Морозно{%- else -%}☀️ Хорошая погода{%- endif -%}
         {%- endif -%}
 
-      # --- ВЕРСИЯ ДЛЯ TELEGRAM И MAX (HTML) ---
+      # --- ЕДИНАЯ ВЕРСИЯ HTML (TELEGRAM, MAX, VK) ---
       msg_text_html: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set t_current = forecast[0].temperature -%}
@@ -245,65 +244,6 @@ action:
         {{ '\n\n' }}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
         {%- endif -%}
 
-      # --- ВЕРСИЯ ДЛЯ VK (PLAIN TEXT) ---
-      msg_text_plain: >-
-        {%- set forecast = daily_weather_data[weather_entity].forecast -%}
-        {%- set t_current = forecast[0].temperature -%}
-        {%- set temps = forecast[:24] | map(attribute='temperature') | list -%}
-        {%- set t_min = temps | min -%}
-        {%- set t_max = temps | max -%}
-        {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
-        {%- set wet_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] -%}
-        {%- set mapper = {'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning, 'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail} -%}
-        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
-        🌡 Сейчас: {{ t_current }}°C (Мин: {{ t_min }}°C, Макс: {{ t_max }}°C){{ '\n' }}
-        {%- if is_bad %}
-        {{ '\n' }}Внимание, ожидаются осадки (24ч):
-        {%- set ns = namespace(blocks=[], current_block=[]) -%}
-        {%- for hour in forecast[:24] if hour.condition in bad_weather -%}
-          {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
-          {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
-            {%- set ns.current_block = ns.current_block + [hour] -%}
-          {%- else -%}
-            {%- if ns.current_block -%}{%- set ns.blocks = ns.blocks + [ns.current_block] -%}{%- endif -%}
-            {%- set ns.current_block = [hour] -%}
-          {%- endif -%}
-        {%- endfor -%}
-        {%- if ns.current_block -%}{%- set ns.blocks = ns.blocks + [ns.current_block] -%}{%- endif -%}
-        
-        {%- for block in ns.blocks -%}
-        {%- set start = block[0] -%}
-        {%- set end = block[-1] -%}
-        {%- set c_name = mapper[start.condition] if start.condition in mapper else start.condition -%}
-        {%- set now_day = as_timestamp(now()) | timestamp_custom('%d') -%}
-        {%- set hour_day = as_timestamp(start.datetime) | timestamp_custom('%d') -%}
-        {%- set day_text = ' (завтра)' if now_day != hour_day else '' -%}
-        {%- if start == end -%}
-        {{ '\n' }}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}{{ day_text }} — {{ c_name }} ({{ start.temperature }}°C)
-        {%- else -%}
-        {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
-        {{ '\n' }}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }}{{ day_text }} — {{ c_name }} ({{ start.temperature }}°C)
-        {%- endif -%}
-        {%- endfor -%}
-
-        {{ '\n\n' }}{%- set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) | list | count > 0 -%}
-        {%- if has_rain %}{{ adv_umbrella | replace('<b>', '') | replace('</b>', '') }}{% else %}{{ adv_warm | replace('<b>', '') | replace('</b>', '') }}{% endif %}
-        {%- else %}
-        {{ '\n' }}Доброе утро!
-        {{ '\n' }}Осадков не ожидается{% if t_current < 0 %}, но давайте проверим градусник.{% else %}.{% endif %}{{ '\n' }}
-        {%- if t_current < limit_cold -%}
-        {{ '\n' }}{{ adv_freeze | replace('<b>', '') | replace('</b>', '') }}
-        {%- elif t_current < -5 -%}
-        {{ '\n' }}{{ adv_cool | replace('<b>', '') | replace('</b>', '') }}
-        {%- else -%}
-        {{ '\n' }}{{ adv_good | replace('<b>', '') | replace('</b>', '') }}
-        {%- endif -%}
-        {%- endif -%}
-
-        {%- if map_link != '' %}
-        {{ '\n\n' }}🗺 Карта осадков: {{ map_link }}
-        {%- endif -%}
-
   # --- БЛОКИ ОТПРАВКИ ---
  
   # 1. Telegram
@@ -323,12 +263,13 @@ action:
       - condition: template
         value_template: "{{ vk_targets | length > 0 }}"
     then:
-      - action: notify.send_message
+      - action: vk_notify.send_message
         target:
           entity_id: "{{ vk_targets }}"
         data:
           title: "{{ msg_title }}"
-          message: "{{ msg_text_plain }}"
+          message: "{{ msg_text_html }}"
+          parse_mode: html
 
   # 3. Max Notify
   - if:

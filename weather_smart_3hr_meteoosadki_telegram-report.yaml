@@ -1,8 +1,8 @@
 blueprint:
-  name: "Оповещение: Осадки (Активная проверка) v1.5"
+  name: "Оповещение: Осадки (Активная проверка) v1.6"
   description: >
     Проверяет погоду по расписанию. Если в ближайшие 3 ЧАСА (включая текущий) ожидаются осадки — шлет уведомление.
-    Поддерживает Telegram (HTML), Max Notify (HTML) и VK Notify (Plain Text).
+    Поддерживает Telegram, Max Notify и VK Notify (теперь с полной поддержкой HTML и ссылок!).
     Фильтрует прошедшее время.
   domain: automation
 
@@ -46,7 +46,7 @@ blueprint:
 
     vk_notify_target:
       name: "💬 Получатель VK Notify"
-      description: Выберите сущности VK Notify. Отправка будет без HTML-тегов.
+      description: Выберите сущности VK Notify. (Используется HTML-разметка)
       default:
         entity_id: []
       selector:
@@ -56,7 +56,7 @@ blueprint:
 
     max_notify_target:
       name: "💬 Получатель Max Notify"
-      description: Выберите сущности Max Notify. Отправка в формате HTML.
+      description: Выберите сущности Max Notify. (Используется HTML-разметка)
       default:
         entity_id: []
       selector:
@@ -189,50 +189,6 @@ action:
             {{'\n\n'}}<a href="{{ map_link }}">🗺 Открыть карту осадков</a>
             {% endif %}
 
-          msg_text_plain: >-
-            {%- set forecast = weather_data[weather_entity].forecast -%}
-            {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
-            {%- set mapper = {
-              'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈',
-              'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'
-            } -%}
-            {%- set time_filter = namespace(future_forecast=[]) -%}
-            {%- for h in forecast -%}
-              {%- if (as_timestamp(h.datetime) + 3600) > as_timestamp(now()) -%}
-                {%- set time_filter.future_forecast = time_filter.future_forecast + [h] -%}
-              {%- endif -%}
-            {%- endfor -%}
-            Внимание, прогноз на 3 часа:
-            {%- set ns = namespace(blocks=[], current_block=[]) -%}
-            {%- for hour in time_filter.future_forecast[:3] if hour.condition in bad_weather -%}
-              {%- set prev = ns.current_block[-1] if ns.current_block else none -%}
-              {%- if prev and (as_timestamp(hour.datetime) - as_timestamp(prev.datetime)) == 3600 -%}
-                {%- set ns.current_block = ns.current_block + [hour] -%}
-              {%- else -%}
-                {%- if ns.current_block -%}
-                  {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
-                {%- endif -%}
-                {%- set ns.current_block = [hour] -%}
-              {%- endif -%}
-            {%- endfor -%}
-            {%- if ns.current_block -%}
-              {%- set ns.blocks = ns.blocks + [ns.current_block] -%}
-            {%- endif -%}
-            {%- for block in ns.blocks -%}
-              {%- set start = block[0] -%}
-              {%- set end = block[-1] -%}
-              {%- set c_name = mapper[start.condition] if start.condition in mapper else start.condition -%}
-              {%- if start == end -%}
-            {{'\n'}}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }} {{ c_name }} ({{ start.temperature }}°C)
-              {%- else -%}
-                {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
-            {{'\n'}}🕒 {{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }} {{ c_name }} ({{ start.temperature }}°C)
-              {%- endif -%}
-            {%- endfor -%}
-            {% if map_link != '' %}
-            {{'\n\n'}}🗺 Карта осадков: {{ map_link }}
-            {% endif %}
-
       # 1. Отправка в Telegram
       - if:
           - condition: template
@@ -245,17 +201,18 @@ action:
               title: "{{ msg_title }}"
               message: "{{ msg_text_html }}"
 
-      # 2. Отправка в VK Notify
+      # 2. Отправка в VK Notify (Обновлено на новый сервис и HTML)
       - if:
           - condition: template
             value_template: "{{ vk_targets | length > 0 }}"
         then:
-          - action: notify.send_message
+          - action: vk_notify.send_message
             target:
               entity_id: "{{ vk_targets }}"
             data:
               title: "{{ msg_title }}"
-              message: "{{ msg_text_plain }}"
+              message: "{{ msg_text_html }}"
+              parse_mode: html
 
       # 3. Отправка в Max Notify
       - if:

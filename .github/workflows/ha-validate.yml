@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Скачивание репозитория
         uses: actions/checkout@v4
-      
+
       - name: Запуск yamllint
         uses: ibiqlik/action-yamllint@v3
         with:
@@ -55,7 +55,8 @@ jobs:
           echo "default_config:" > fake_config/configuration.yaml
 
       - name: Проверка конфигурации через HA CLI
-        uses: frenck/action-home-assistant@v1  # <-- Добавили дефис тут!
+        uses: frenck/action-home-assistant@v1
+        continue-on-error: false
         with:
           path: "fake_config"
-          version: "latest"
+          version: "2026.5.4"

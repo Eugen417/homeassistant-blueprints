@@ -7,6 +7,8 @@ blueprint:
     с полноценным HTML-форматированием, заголовками и отключением упоминаний.
     Добавлен вывод конкретных названий перекрываемых кранов в текстовые и голосовые уведомления.
   domain: automation
+
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/security/new_waterleackdeteckt_tts_push_notifi.yaml
   
   input:
     zone_1_name:

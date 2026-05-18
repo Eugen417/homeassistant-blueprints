@@ -1,7 +1,11 @@
+import os
+import shutil
+import re
+
 # Базовая ссылка на твой репозиторий (ветка main)
 BASE_RAW_URL = "https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/"
 
-# Словарь миграции: "старый_файл.yaml" : "новая_папка/новый_файл.yaml"
+# Полный словарь миграции твоих файлов
 migration_map = {
     # --- 🔋 Battery & Devices (Устройства и Питание) ---
     "Battery_Report_V3.4_EN.yaml": "automation/devices/Battery_Report_V3.4_EN.yaml",
@@ -9,8 +13,6 @@ migration_map = {
     "z2m_offline_detection.yaml": "automation/devices/z2m_offline_detection.yaml",
     "restart_integration_if_device_state_unknown.yaml": "automation/system/restart_integration_if_device_state_unknown.yaml",
     "ha_ikea_matter_controller.yaml": "automation/devices/ha_ikea_matter_controller.yaml",
-    
-    # Скрипты Home Assistant обычно кладут в отдельную папку script/
     "script_battery_plus_tg_push_report.yaml": "script/script_battery_plus_tg_push_report.yaml",
 
     # --- ⛅ Weather (Погода) ---
@@ -39,3 +41,42 @@ migration_map = {
     "vk_person_tracker.yaml": "automation/presence/vk_person_tracker.yaml",
     "cover_collision_protect.yaml": "automation/cover/cover_collision_protect.yaml"
 }
+
+def update_source_url(file_path, new_url):
+    """Находит и заменяет source_url в файле, сохраняя форматирование."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    updated_content = re.sub(
+        r'source_url:\s*https://raw\.githubusercontent\.com/.*', 
+        f'source_url: {new_url}', 
+        content
+    )
+    
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(updated_content)
+
+print("Начинаем миграцию блюпринтов...\n")
+
+for old_file, new_path in migration_map.items():
+    if not os.path.exists(old_file):
+        print(f"⚠️ Файл {old_file} не найден, пропускаем.")
+        continue
+
+    # 1. Создаем новые папки
+    new_dir = os.path.dirname(new_path)
+    if new_dir:
+        os.makedirs(new_dir, exist_ok=True)
+        
+    # 2. Копируем файл 
+    shutil.copy2(old_file, new_path)
+    print(f"✅ Скопирован: {old_file} -> {new_path}")
+    
+    # Формируем новую ссылку
+    new_raw_url = BASE_RAW_URL + new_path
+    
+    # 3. Обновляем ссылки в обоих файлах
+    update_source_url(new_path, new_raw_url)
+    update_source_url(old_file, new_raw_url)
+
+print("\n🎉 Миграция успешно завершена!")

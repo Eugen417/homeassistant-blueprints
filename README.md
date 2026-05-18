@@ -56,7 +56,7 @@ Collection of blueprints and scripts for Home Assistant.
 | :--- | :--- | :---: |
 | **person_tracker_RU.yaml** | **[RU]** Трекер персон. Отслеживание входа/выхода из зон и по запросу актуальное местоположение. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FEugen417%2Fhomeassistant-blueprints%2Fmain%2Fautomation%2Fpresence%2Fperson_tracker_RU.yaml) |
 | **vk_person_tracker.yaml** | **[RU]** Трекер персон. Отслеживание входа/выхода из зон и по запросу актуальное местоположение. Работает только с VK Notify (v1.5.2 и выше). | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FEugen417%2Fhomeassistant-blueprints%2Fmain%2Fautomation%2Fpresence%2Fvk_person_tracker.yaml) |
-| **cover_collision_protect.yaml** | **[RU]** Защита vertical жалюзи от поломки, поворот/раздвижение. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FEugen417%2Fhomeassistant-blueprints%2Fmain%2Fautomation%2Fcover%2Fcover_collision_protect.yaml) |
+| **cover_collision_protect.yaml** | **[RU]** Защита вертикальных жалюзи от поломки, поворот/раздвижение. | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FEugen417%2Fhomeassistant-blueprints%2Fmain%2Fautomation%2Fcover%2Fcover_collision_protect.yaml) |
 
 ---
 

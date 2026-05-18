@@ -11,7 +11,7 @@ blueprint:
     
     **Использование:** После сохранения этого блюпринта в виде скрипта, в любой вашей автоматизации в блоке "Тогда" выберите "Выполнить действие", находите ваш скрипт "Алиса: Умный рупор" и настраивайте удобный визуальный интерфейс!
   domain: script
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/media/ya_st_alice_simple.yaml
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/script/ya_st_alice_simple.yaml
   input: {}
 
 icon: mdi:account-voice

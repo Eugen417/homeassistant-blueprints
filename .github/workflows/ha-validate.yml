@@ -44,7 +44,7 @@ jobs:
       - name: Подготовка тестовой среды HA
         run: |
           mkdir -p fake_config/blueprints/automation/test
-          cp loggia/*.yaml fake_config/blueprints/automation/test/
+          cp *.yaml fake_config/blueprints/automation/test/
           echo "default_config:" > fake_config/configuration.yaml
 
       # Запускаем официальный валидатор HA

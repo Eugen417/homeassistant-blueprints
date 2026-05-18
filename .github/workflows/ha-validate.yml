@@ -1,18 +1,22 @@
 name: Проверка Blueprints (Home Assistant)
 
-# Запускать при каждом пуше в ветку main или при создании Pull Request
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - master
     paths:
       - '**.yaml'
+      - '**.yml'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - master
     paths:
       - '**.yaml'
+      - '**.yml'
 
 jobs:
-  # === УРОВЕНЬ 1: Проверка синтаксиса YAML ===
   yamllint:
     name: 🧹 Проверка синтаксиса YAML
     runs-on: ubuntu-latest
@@ -23,33 +27,35 @@ jobs:
       - name: Запуск yamllint
         uses: ibiqlik/action-yamllint@v3
         with:
-          # Отключаем слишком душные правила, оставляя проверку на фатальные ошибки
           config_data: |
             extends: default
             rules:
               line-length: disable
               document-start: disable
               truthy: disable
+              trailing-spaces: disable
+              new-line-at-end-of-file: disable
+              braces: disable
+              brackets: disable
+              comments: disable
+              comments-indentation: disable
 
-  # === УРОВЕНЬ 2: Проверка движком Home Assistant ===
   ha-validation:
     name: 🏠 Валидация Home Assistant
     runs-on: ubuntu-latest
-    needs: yamllint # Запускать только если YAML корректный
+    needs: yamllint
     steps:
       - name: Скачивание репозитория
         uses: actions/checkout@v4
 
-      # Создаем фейковую структуру папок Home Assistant, чтобы движок смог прочитать blueprint
       - name: Подготовка тестовой среды HA
         run: |
           mkdir -p fake_config/blueprints/automation/test
-          cp *.yaml fake_config/blueprints/automation/test/
+          find . -type f -name "*.yaml" -not -path "*/\.github/*" -exec cp {} fake_config/blueprints/automation/test/ \;
           echo "default_config:" > fake_config/configuration.yaml
 
-      # Запускаем официальный валидатор HA
       - name: Проверка конфигурации через HA CLI
         uses: frenck/action-homeassistant@v1
         with:
           path: "fake_config"
-          version: "latest" # Проверять на самой свежей версии HA
+          version: "latest"

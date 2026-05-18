@@ -1,12 +1,12 @@
 blueprint:
   name: 🪫 Отчет по состоянию батарей (v3.11.0 Parallel HTML Edition)
   description: |
-    Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня. 
+    Создает два кратких отчета (с разделением на "Замена" и "Зарядка") по устройствам, заряд которых ниже критического уровня.
     Отправляет отчеты на мобильное устройство, в Telegram, VK Notify (Keyboard Edition) и/или Max в заданное время.
-    
+
     **v3.11.0:** Max Notify и VK Notify переведены на нативные службы с поддержкой HTML и выделенных заголовков.
     Отправка во все мессенджеры теперь выполняется параллельно — ошибка в одном не блокирует остальные!
-    
+
     **Важное требование!** Для работы автоматизации необходимо предварительно установить и настроить интеграцию **HA-Battery Notes**.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/refs/heads/main/Battery_Report_V3.4_RU.yaml
@@ -49,7 +49,7 @@ blueprint:
       selector:
         device:
           integration: mobile_app
-    
+
     telegram_notify_target:
       name: 💬 Уведомления Telegram
       description: Выберите сущности вашего сервиса Telegram (notify.telegram_bot_...).
@@ -109,7 +109,7 @@ blueprint:
               value: Sat
             - label: Воскресенье
               value: Sun
-    
+
     critical_level:
       name: ⚠️ Критический уровень (%)
       description: Уровень заряда, ниже которого устройство помечается как требующее внимания.
@@ -121,7 +121,7 @@ blueprint:
           step: 1
           unit_of_measurement: "%"
           mode: box
-          
+
     excluded_sensors:
       name: 🗑️ Исключаемые сенсоры
       description: Сенсоры уровня заряда, которые нужно исключить из отчета.
@@ -239,13 +239,13 @@ blueprint:
 
 variables:
   mobile_device_id: !input mobile_notify_target
-  telegram_notify_entities: !input telegram_notify_target 
+  telegram_notify_entities: !input telegram_notify_target
   vk_notify_target: !input vk_notify_target
   max_notify_target: !input max_notify_target
   critical_threshold: !input critical_level
   excluded_entity_ids: !input excluded_sensors
   send_full_report: !input send_full_report_option
-  full_report_days: !input full_report_days 
+  full_report_days: !input full_report_days
   trigger_days: !input trigger_days
   # Text variables
   text_disposable_header: !input text_disposable_header
@@ -285,11 +285,11 @@ variables:
       {% endif %}
     {% endfor %}
     {{ ns.target_ids }}
-    
+
   vk_targets: >-
     {% set raw = vk_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
-    
+
   max_targets: >-
     {% set raw = max_notify_target.entity_id | default([]) %}
     {{ [raw] | flatten | reject('==', '') | list }}
@@ -306,7 +306,7 @@ action:
     variables:
       threshold: "{{ critical_threshold | int }}"
       exclude_list: "{{ excluded_entity_ids.entity_id | default([]) }}"
-      
+
       # Сообщение о незаряжаемых батареях (Замена) - КРАТКИЙ ОТЧЕТ 1
       disposable_message: >-
         {% set ns = namespace(disposable_lines=[]) %}
@@ -316,7 +316,7 @@ action:
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
             {% if numerical_level >= 0 and numerical_level < threshold %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
@@ -354,7 +354,7 @@ action:
               {% if is_rechargeable %}
                 {# Экранирование данных, которые будут вставлены в HTML #}
                 {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
-                
+
                 {% set line_action = text_rechargeable_action | replace('%LEVEL%', numerical_level | string) %}
                 {% set line = escaped_name ~ ": " ~ line_action %}
                 {% set ns.rechargeable_lines = ns.rechargeable_lines + [{ 'level': numerical_level, 'line': line }] %}
@@ -369,35 +369,35 @@ action:
         {% else %}
           {{ text_rechargeable_ok ~ critical_threshold ~ "%." }}
         {% endif %}
-      
+
       # ОТЧЕТ 3: ПОЛНЫЙ СПИСОК (Сортировка и цветовая индикация)
       full_report_body_list: >-
         {% set ns = namespace(all_lines=[]) %}
         {% set yellow_boundary = 40 %}
         {% set red_boundary = 15 %}
-        
+
         {% for sensor in states.sensor %}
           {% if sensor.attributes.battery_last_reported_level is defined and sensor.entity_id not in exclude_list %}
             {% set name = sensor.attributes.friendly_name | default(sensor.entity_id) %}
             {% set numerical_level = sensor.attributes.battery_last_reported_level | float(default=-1) | int(default=-1) %}
-            
+
             {% if numerical_level >= 0 %}
               {% set battery_type = sensor.attributes.battery_type | default('Unknown') %}
-              {% set cleaned_name = name | replace(' Батарея+', '') | trim %} 
+              {% set cleaned_name = name | replace(' Батарея+', '') | trim %}
               {% set is_rechargeable = (battery_type == 'Rechargeable' or 'F946B' in cleaned_name or 'F966B' in cleaned_name or 'privod' in cleaned_name) %}
-              
-              {% set status_icon = '🟢' %} 
+
+              {% set status_icon = '🟢' %}
               {% if numerical_level < red_boundary %}
-                {% set status_icon = '🔴' %} 
+                {% set status_icon = '🔴' %}
               {% elif numerical_level < yellow_boundary %}
-                {% set status_icon = '🟡' %} 
+                {% set status_icon = '🟡' %}
               {% endif %}
-              
+
               {% set status_label = '' %}
               {% if numerical_level < threshold %}
                 {% set status_label = text_full_replace_label if not is_rechargeable else text_full_charge_label %}
               {% endif %}
-              
+
               {% set details = "" %}
               {% if not is_rechargeable %}
                 {% set battery_quantity = sensor.attributes.battery_quantity | default('1') | string %}
@@ -406,10 +406,10 @@ action:
                 {% set escaped_quantity = battery_quantity | replace('<', '&lt;') | replace('>', '&gt;') %}
                 {% set details = " (Тип: " ~ escaped_battery_type ~ ", Кол-во: " ~ escaped_quantity ~ " шт)" %}
               {% endif %}
-              
+
               {# Экранирование имени устройства #}
               {% set escaped_name = cleaned_name | string | replace('<', '&lt;') | replace('>', '&gt;') %}
-              
+
               {% set line = status_icon ~ " " ~ escaped_name ~ ": " ~ numerical_level ~ "%" ~ status_label ~ details %}
               {% set ns.all_lines = ns.all_lines + [{ 'level': numerical_level, 'line': line }] %}
             {% endif %}
@@ -417,24 +417,24 @@ action:
         {% endfor %}
         {% set sorted_all = ns.all_lines | sort(attribute='level', reverse=true) %}
         {% set all_output = sorted_all | map(attribute='line') | list %}
-        
+
         {% if all_output | length > 0 %}
           {{ all_output | join('\n') }}
         {% else %}
           {{ text_no_sensors }}
         {% endif %}
-        
+
       # ОТЧЕТ 4: СВОДКА ПО ТИПУ БАТАРЕИ
       battery_types_summary: >-
         {% set ns = namespace(output_lines=[]) %}
-        {% set all_battery_sensors = states.sensor 
-            | selectattr('attributes.battery_last_reported_level', 'defined') 
-            | rejectattr('entity_id', 'in', exclude_list) 
+        {% set all_battery_sensors = states.sensor
+            | selectattr('attributes.battery_last_reported_level', 'defined')
+            | rejectattr('entity_id', 'in', exclude_list)
             | list %}
-          
-        {% set grouped_by_type = all_battery_sensors 
+
+        {% set grouped_by_type = all_battery_sensors
             | groupby('attributes.battery_type') %}
-          
+
         {% for type, sensors in grouped_by_type %}
           {% set total_quantity = namespace(value=0) %}
           {% for sensor in sensors %}
@@ -449,17 +449,17 @@ action:
 
           {# Экранирование имени типа батареи #}
           {% set escaped_display_type = display_type | replace('<', '&lt;') | replace('>', '&gt;') %}
-          
+
           {% set line = "• " ~ escaped_display_type ~ " (Всего: " ~ total_quantity.value ~ " шт)" %}
           {% set ns.output_lines = ns.output_lines + [line] %}
         {% endfor %}
-        
+
         {% if ns.output_lines | length > 0 %}
           {{ text_summary_header ~ ns.output_lines | sort | join('\n') }}
         {% else %}
           {{ text_no_summary_data }}
         {% endif %}
-      
+
       # ОТЧЕТ 5: УСТРОЙСТВА ВНЕ СЕТИ (UNAVAILABLE / UNKNOWN)
       offline_sensors_report: >-
         {% set ns = namespace(offline_lines=[]) %}
@@ -474,7 +474,7 @@ action:
             {% endif %}
           {% endif %}
         {% endfor %}
-        
+
         {% if ns.offline_lines | length > 0 %}
           {{ text_offline_header ~ '\n' ~ ns.offline_lines | join('\n') }}
         {% endif %}
@@ -490,7 +490,7 @@ action:
           {% endif %}
         {% endfor %}
         {{ total.value }}
-        
+
       # СБОРКА ТЕЛА ПОЛНОГО ОТЧЕТА (БЕЗ ЗАГОЛОВКА, ДЛЯ VK И MAX)
       full_report_body: >
         {% set total_text = text_grand_total | replace('%TOTAL%', grand_total_quantity | default(0) | string) %}
@@ -524,15 +524,15 @@ action:
                         {% else %}
                           {{ title_short_replace_ok | replace('<b>', '') | replace('</b>', '') }}
                         {% endif %}
-                      message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}" 
+                      message: "{{ disposable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
                     continue_on_error: true
-        
+
               # 2.2 Telegram Bot (HTML)
               - if: "{{ target_chat_ids | length > 0 }}"
                 then:
                   - action: telegram_bot.send_message
                     data:
-                      chat_id: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}"
                       message: |
                         {% if disposable_message.startswith('⚠️') %}
                           {% set header = '<b>' ~ title_short_replace_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
@@ -542,7 +542,7 @@ action:
                         {{ header ~ "\n\n" ~ disposable_message }}
                       parse_mode: html
                     continue_on_error: true
-                      
+
               # 2.3 VK Notify (HTML)
               - if: "{{ vk_targets | length > 0 }}"
                 then:
@@ -607,13 +607,13 @@ action:
                         {% endif %}
                       message: "{{ rechargeable_message | replace('<b>', '') | replace('</b>', '') | replace('<i>', '') | replace('</i>', '') | replace('&lt;', '<') | replace('&gt;', '>') | replace('&amp;', '&') }}"
                     continue_on_error: true
-        
+
               # 3.2 Telegram Bot (HTML)
               - if: "{{ target_chat_ids | length > 0 }}"
                 then:
                   - action: telegram_bot.send_message
                     data:
-                      chat_id: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}"
                       message: |
                         {% if rechargeable_message.startswith('⚠️') %}
                           {% set header = '<b>' ~ title_short_charge_low | replace('<', '&lt;') ~ critical_threshold ~ '%</b>' %}
@@ -623,7 +623,7 @@ action:
                         {{ header ~ "\n\n" ~ rechargeable_message }}
                       parse_mode: html
                     continue_on_error: true
-                      
+
               # 3.3 VK Notify (HTML)
               - if: "{{ vk_targets | length > 0 }}"
                 then:
@@ -682,11 +682,11 @@ action:
                 then:
                   - action: telegram_bot.send_message
                     data:
-                      chat_id: "{{ target_chat_ids }}" 
+                      chat_id: "{{ target_chat_ids }}"
                       message: "<b>{{ title_full_report | replace('<b>', '') | replace('</b>', '') }}</b>\n\n{{ full_report_body }}"
                       parse_mode: html
                     continue_on_error: true
-                      
+
               # 4.2 Полный отчет - VK Notify
               - if: "{{ vk_targets | length > 0 }}"
                 then:
@@ -699,7 +699,7 @@ action:
                       parse_mode: html
                       disable_mentions: true
                     continue_on_error: true
-                      
+
               # 4.3 Полный отчет - Max Notify (HTML)
               - if: "{{ max_targets | length > 0 }}"
                 then:

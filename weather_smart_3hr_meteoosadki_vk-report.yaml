@@ -9,7 +9,7 @@ blueprint:
     независимые функции, вам нужно создать **ДВА** помощника. 1. Перейдите в **Настройки**
     -> **Устройства и службы** -> **Вспомогательные элементы**. 2. Нажмите **Создать
     вспомогательный элемент** -> **Текст** (input_text). 3. Назовите его (например,
-    `VK Погода Утро`) и сохраните. Повторите процесс для второго (например, `VK Погода
+    `VK Погода Утро`) and сохраните. Повторите процесс для второго (например, `VK Погода
     Мониторинг`). 4. Выберите созданные элементы в соответствующих полях «Хелпер для
     ID» ниже.\n⚠️ **ОСОБЕННОСТИ РЕЖИМОВ «ЗАМЕНЯТЬ» И «УДАЛЯТЬ»:** 1. **Зависимость:**
     Оба этих режима **не будут работать** без выбранного «Помощника для ID». 2. **Первый
@@ -28,7 +28,7 @@ blueprint:
       selector:
         entity:
           domain:
-          - weather
+            - weather
           multiple: false
           reorder: false
     vk_notify_target:
@@ -36,7 +36,7 @@ blueprint:
       selector:
         entity:
           filter:
-          - integration: vk_notify
+            - integration: vk_notify
           multiple: false
           reorder: false
     enable_morning:
@@ -46,7 +46,7 @@ blueprint:
         boolean: {}
     morning_time:
       name: ⏰ Время утреннего отчета
-      default: 08:00:00
+      default: "08:00:00"
       selector:
         time: {}
     morning_helper:
@@ -54,7 +54,7 @@ blueprint:
       selector:
         entity:
           domain:
-          - input_text
+            - input_text
           multiple: false
           reorder: false
     morning_mode:
@@ -63,12 +63,12 @@ blueprint:
       selector:
         select:
           options:
-          - label: Заменять (Редактировать)
-            value: edit
-          - label: Удалять старое и присылать новое
-            value: delete
-          - label: Спамить (Просто новые сообщения)
-            value: spam
+            - label: Заменять (Редактировать)
+              value: edit
+            - label: Удалять старое и присылать новое
+              value: delete
+            - label: Спамить (Просто новые сообщения)
+              value: spam
           multiple: false
           custom_value: false
           sort: false
@@ -83,12 +83,12 @@ blueprint:
       selector:
         select:
           options:
-          - label: 15 минут
-            value: /15
-          - label: 30 минут
-            value: /30
-          - label: 1 час
-            value: '0'
+            - label: 15 минут
+              value: /15
+            - label: 30 минут
+              value: /30
+            - label: 1 час
+              value: '0'
           multiple: false
           custom_value: false
           sort: false
@@ -97,7 +97,7 @@ blueprint:
       selector:
         entity:
           domain:
-          - input_text
+            - input_text
           multiple: false
           reorder: false
     monitor_mode:
@@ -106,12 +106,12 @@ blueprint:
       selector:
         select:
           options:
-          - label: Заменять (Редактировать)
-            value: edit
-          - label: Удалять старое и присылать новое
-            value: delete
-          - label: Спамить (Просто новые сообщения)
-            value: spam
+            - label: Заменять (Редактировать)
+              value: edit
+            - label: Удалять старое и присылать новое
+              value: delete
+            - label: Спамить (Просто новые сообщения)
+              value: spam
           multiple: false
           custom_value: false
           sort: false
@@ -122,6 +122,7 @@ blueprint:
         text:
           multiple: false
           multiline: false
+
 variables:
   weather_entity: !input weather_entity
   vk_target: !input vk_notify_target
@@ -129,273 +130,271 @@ variables:
   m_enabled: !input enable_morning
   m_helper: !input morning_helper
   m_mode: !input morning_mode
-  m_id: '{{ states(m_helper) if states(m_helper) not in [''unknown'', ''unavailable'',
-    ''''] else '''' }}'
+  m_id: "{{ states(m_helper) if states(m_helper) not in ['unknown', 'unavailable', ''] else '' }}"
   p_enabled: !input enable_monitor
   p_helper: !input monitor_helper
   p_mode: !input monitor_mode
-  p_id: '{{ states(p_helper) if states(p_helper) not in [''unknown'', ''unavailable'',
-    ''''] else '''' }}'
-trigger:
-- platform: time
-  at: !input morning_time
-  id: morning_trigger
-- platform: time_pattern
-  minutes: !input monitor_frequency
-  id: monitor_trigger
-action:
-- action: weather.get_forecasts
-  target:
-    entity_id: !input weather_entity
-  data:
-    type: hourly
-  response_variable: weather_data
-- choose:
-  - conditions:
-    - condition: trigger
-      id: morning_trigger
-    - condition: template
-      value_template: '{{ m_enabled }}'
-    sequence:
-    - variables:
-        morning_msg: >-
-          {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %} 
-          {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %} 
-          {% set fc = weather_data[weather_entity].forecast %} 
-          {% set t_current = fc[0].temperature %}
-          {% set temps = fc[:24] | map(attribute='temperature') | list %}
-          {% set t_min = temps | min %}
-          {% set t_max = temps | max %}
-          {% set ns = namespace(future=[], blocks=[], current_block=[], count=0, out="") %} 
-          {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
-            {% if ns.count < 24 %}
-              {% set ns.future = ns.future + [h] %}
-              {% set ns.count = ns.count + 1 %}
-            {% endif %}
-          {% endfor %} 
-          {% for hour in ns.future if hour.condition in bad_weather %}
-            {% set prev = ns.current_block[-1] if ns.current_block else none %}
-            {% if prev and (as_timestamp(hour.datetime, 0) - as_timestamp(prev.datetime, 0)) == 3600 %}
-              {% set ns.current_block = ns.current_block + [hour] %}
-            {% else %}
-              {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
-              {% set ns.current_block = [hour] %}
-            {% endif %}
-          {% endfor %} 
-          {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
-          
-          {% if ns.blocks | count > 0 %}
-            {% set ns.out = "<b>Доброе утро!</b> ☕️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\n<b>Внимание, ожидаются осадки (24ч):</b>\n" %}
-            {% set ns.min_temp = 50 %}
-            {% for block in ns.blocks %}
-              {% set start, end = block[0], block[-1] %}
-              {% if start.temperature | float < ns.min_temp %}{% set ns.min_temp = start.temperature | float %}{% endif %}
-              
-              {% set now_day = as_timestamp(now(), 0) | timestamp_custom('%d') %}
-              {% set hour_day = as_timestamp(start.datetime, 0) | timestamp_custom('%d') %}
-              {% set day_text = ' (завтра)' if now_day != hour_day else '' %}
+  p_id: "{{ states(p_helper) if states(p_helper) not in ['unknown', 'unavailable', ''] else '' }}"
 
-              {% if start == end %}
-                {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ day_text %}
-              {% else %}
-                {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ ((as_timestamp(end.datetime, 0) + 3600) | timestamp_custom('%H:%M')) ~ day_text %}
-              {% endif %}
-              
-              {% set ns.out = ns.out ~ "🕒 <b>" ~ t_range ~ "</b> — " ~ mapper.get(start.condition, start.condition) ~ " (" ~ start.temperature ~ "°C)\n" %}
-            {% endfor %}
-            
-            {% if ns.min_temp <= 7 %}
-              {% set ns.out = ns.out ~ "\n🥶 <b>Холодно и сыро.</b> Надеюсь, вы тепло одеты и зонт с вами!" %}
-            {% else %}
-              {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
-            {% endif %}
-          {% else %}
-            {% set ns.out = "<b>Доброе утро!</b> ☀️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\nВ ближайшие 24 часа осадков не ожидается. Хорошего дня!" %}
-          {% endif %} {{ ns.out | trim }}
-        vk_kb: "{% if map_link != '' %} {\"inline\": true, \"buttons\": [[{\"action\":
-          {\"type\": \"open_link\", \"link\": \"{{ map_link }}\", \"label\": \"🗺
-          Карта Windy\"}}]]} {% else %}null{% endif %}"
-    - choose:
+trigger:
+  - platform: time
+    at: !input morning_time
+    id: morning_trigger
+  - platform: time_pattern
+    minutes: !input monitor_frequency
+    id: monitor_trigger
+
+action:
+  - action: weather.get_forecasts
+    target:
+      entity_id: !input weather_entity
+    data:
+      type: hourly
+    response_variable: weather_data
+  - choose:
       - conditions:
-        - condition: template
-          value_template: '{{ m_mode == ''edit'' and m_id != '''' }}'
-        sequence:
-        - action: vk_notify.edit_message
-          continue_on_error: true
-          data:
-            entity_id: '{{ vk_target }}'
-            message: "<b>⛅ Прогноз на сутки</b>\n{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-            conversation_message_id: '{{ m_id | int(0) }}'
-            keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else omit }}'
-            parse_mode: html
-      - conditions:
-        - condition: template
-          value_template: '{{ m_mode == ''delete'' }}'
-        sequence:
-        - if:
+          - condition: trigger
+            id: morning_trigger
           - condition: template
-            value_template: '{{ m_id != '''' }}'
-          then:
-          - action: vk_notify.delete_message
-            continue_on_error: true
-            data:
-              entity_id: '{{ vk_target }}'
-              conversation_message_id: '{{ m_id | int(0) }}'
-        - action: vk_notify.send_message
-          data:
-            entity_id: '{{ vk_target }}'
-            title: "⛅ Прогноз на сутки"
-            message: "{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-            keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else omit }}'
-            parse_mode: html
-          response_variable: m_ans_del
-        - action: input_text.set_value
-          target:
-            entity_id: '{{ m_helper }}'
-          data:
-            value: '{{ (m_ans_del.values() | first).conversation_message_id }}'
-      default:
-      - action: vk_notify.send_message
-        data:
-          entity_id: '{{ vk_target }}'
-          title: "⛅ Прогноз на сутки"
-          message: "{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-          keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else omit }}'
-          parse_mode: html
-        response_variable: m_ans_spam
-      - action: input_text.set_value
-        target:
-          entity_id: '{{ m_helper }}'
-        data:
-          value: '{{ (m_ans_spam.values() | first).conversation_message_id }}'
-  - conditions:
-    - condition: template
-      value_template: '{{ p_enabled }}'
-    - condition: or
-      conditions:
-      - condition: trigger
-        id: monitor_trigger
-      - condition: template
-        value_template: '{{ trigger is not defined or trigger.platform is none }}'
-    sequence:
-    - variables:
-        rain_list: >-
-          {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %} 
-          {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %} 
-          {% set fc = weather_data[weather_entity].forecast %} 
-          {% set t_current = fc[0].temperature %}
-          {% set ns = namespace(out="", count=0, min_temp=50) %} 
-          {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
-            {% if ns.count < 3 %}
-              {% if h.condition in bad_weather %}
-                {% set ns.out = ns.out ~ "🕒 <b>" ~ (as_timestamp(h.datetime, 0) | timestamp_custom('%H:%M')) ~ "</b> — " ~ mapper.get(h.condition, h.condition) ~ " (" ~ h.temperature ~ "°C)\n" %}
-                {% if h.temperature | float < ns.min_temp %}{% set ns.min_temp = h.temperature | float %}{% endif %}
-              {% endif %}
-              {% set ns.count = ns.count + 1 %}
-            {% endif %}
-          {% endfor %}
-          {% if ns.out != "" %}
-            {% set ns.out = "🌡 Сейчас: <b>" ~ t_current ~ "°C</b>\n\n" ~ ns.out %}
-            {% if ns.min_temp <= 7 %}
-              {% set ns.out = ns.out ~ "\n🥶 <b>Холодно и сыро.</b> Надеюсь, вы тепло одеты и зонт с вами!" %}
-            {% else %}
-              {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
-            {% endif %}
-          {% endif %} {{ ns.out | trim }}
-        vk_kb: "{% if map_link != '' %} {\"inline\": true, \"buttons\": [[{\"action\":
-          {\"type\": \"open_link\", \"link\": \"{{ map_link }}\", \"label\": \"🗺
-          Карта осадков\"}}]]} {% else %}null{% endif %}"
-    - choose:
-      - conditions:
-        - condition: template
-          value_template: '{{ rain_list != '''' }}'
+            value_template: "{{ m_enabled }}"
         sequence:
-        - choose:
-          - conditions:
-            - condition: template
-              value_template: '{{ p_mode == ''edit'' and p_id != '''' }}'
-            sequence:
-            - action: vk_notify.edit_message
-              continue_on_error: true
-              data:
-                entity_id: '{{ vk_target }}'
-                message: "<b>⛅ Оперативный прогноз</b>\nВ ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-                conversation_message_id: '{{ p_id | int(0) }}'
-                keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else
-                  omit }}'
-                parse_mode: html
-          - conditions:
-            - condition: template
-              value_template: '{{ p_mode == ''delete'' }}'
-            sequence:
-            - if:
-              - condition: template
-                value_template: '{{ p_id != '''' }}'
-              then:
-              - action: vk_notify.delete_message
-                continue_on_error: true
+          - variables:
+              morning_msg: >-
+                {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
+                {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %}
+                {% set fc = weather_data[weather_entity].forecast %}
+                {% set t_current = fc[0].temperature %}
+                {% set temps = fc[:24] | map(attribute='temperature') | list %}
+                {% set t_min = temps | min %}
+                {% set t_max = temps | max %}
+                {% set ns = namespace(future=[], blocks=[], current_block=[], count=0, out="") %}
+                {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
+                  {% if ns.count < 24 %}
+                    {% set ns.future = ns.future + [h] %}
+                    {% set ns.count = ns.count + 1 %}
+                  {% endif %}
+                {% endfor %}
+                {% for hour in ns.future if hour.condition in bad_weather %}
+                  {% set prev = ns.current_block[-1] if ns.current_block else none %}
+                  {% if prev and (as_timestamp(hour.datetime, 0) - as_timestamp(prev.datetime, 0)) == 3600 %}
+                    {% set ns.current_block = ns.current_block + [hour] %}
+                  {% else %}
+                    {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
+                    {% set ns.current_block = [hour] %}
+                  {% endif %}
+                {% endfor %}
+                {% if ns.current_block %}{% set ns.blocks = ns.blocks + [ns.current_block] %}{% endif %}
+
+                {% if ns.blocks | count > 0 %}
+                  {% set ns.out = "<b>Доброе утро!</b> ☕️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\n<b>Внимание, ожидаются осадки (24ч):</b>\n" %}
+                  {% set ns.min_temp = 50 %}
+                  {% for block in ns.blocks %}
+                    {% set start, end = block[0], block[-1] %}
+                    {% if start.temperature | float < ns.min_temp %}{% set ns.min_temp = start.temperature | float %}{% endif %}
+
+                    {% set now_day = as_timestamp(now(), 0) | timestamp_custom('%d') %}
+                    {% set hour_day = as_timestamp(start.datetime, 0) | timestamp_custom('%d') %}
+                    {% set day_text = ' (завтра)' if now_day != hour_day else '' %}
+
+                    {% if start == end %}
+                      {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ day_text %}
+                    {% else %}
+                      {% set t_range = (as_timestamp(start.datetime, 0) | timestamp_custom('%H:%M')) ~ "–" ~ ((as_timestamp(end.datetime, 0) + 3600) | timestamp_custom('%H:%M')) ~ day_text %}
+                    {% endif %}
+
+                    {% set ns.out = ns.out ~ "🕒 <b>" ~ t_range ~ "</b> — " ~ mapper.get(start.condition, start.condition) ~ " (" ~ start.temperature ~ "°C)\n" %}
+                  {% endfor %}
+
+                  {% if ns.min_temp <= 7 %}
+                    {% set ns.out = ns.out ~ "\n🥶 <b>Холодно и сыро.</b> Надеюсь, вы тепло одеты и зонт с вами!" %}
+                  {% else %}
+                    {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
+                  {% endif %}
+                {% else %}
+                  {% set ns.out = "<b>Доброе утро!</b> ☀️\n🌡 Сейчас: <b>" ~ t_current ~ "°C</b> (Мин: " ~ t_min ~ "°C, Макс: " ~ t_max ~ "°C)\n\nВ ближайшие 24 часа осадков не ожидается. Хорошего дня!" %}
+                {% endif %} {{ ns.out | trim }}
+              vk_kb: >-
+                {% if map_link != '' %} {"inline": true, "buttons": [[{"action": {"type": "open_link", "link": "{{ map_link }}", "label": "🗺 Карта Windy"}}]]} {% else %}null{% endif %}
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ m_mode == 'edit' and m_id != '' }}"
+                sequence:
+                  - action: vk_notify.edit_message
+                    continue_on_error: true
+                    data:
+                      entity_id: "{{ vk_target }}"
+                      message: "<b>⛅ Прогноз на сутки</b>\n{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                      conversation_message_id: "{{ m_id | int(0) }}"
+                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                      parse_mode: html
+              - conditions:
+                  - condition: template
+                    value_template: "{{ m_mode == 'delete' }}"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ m_id != '' }}"
+                    then:
+                      - action: vk_notify.delete_message
+                        continue_on_error: true
+                        data:
+                          entity_id: "{{ vk_target }}"
+                          conversation_message_id: "{{ m_id | int(0) }}"
+                  - action: vk_notify.send_message
+                    data:
+                      entity_id: "{{ vk_target }}"
+                      title: "⛅ Прогноз на сутки"
+                      message: "{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                      keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                      parse_mode: html
+                    response_variable: m_ans_del
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ m_helper }}"
+                    data:
+                      value: "{{ (m_ans_del.values() | first).conversation_message_id }}"
+            default:
+              - action: vk_notify.send_message
                 data:
-                  entity_id: '{{ vk_target }}'
-                  conversation_message_id: '{{ p_id | int(0) }}'
-            - action: vk_notify.send_message
-              data:
-                entity_id: '{{ vk_target }}'
-                title: "⛅ Оперативный прогноз"
-                message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-                keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else
-                  omit }}'
-                parse_mode: html
-              response_variable: p_ans_del
-            - action: input_text.set_value
-              target:
-                entity_id: '{{ p_helper }}'
-              data:
-                value: '{{ (p_ans_del.values() | first).conversation_message_id }}'
-          default:
-          - action: vk_notify.send_message
-            data:
-              entity_id: '{{ vk_target }}'
-              title: "⛅ Оперативный прогноз"
-              message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-              keyboard: '{{ vk_kb | from_json if (vk_kb | trim) != ''null'' else omit
-                }}'
-              parse_mode: html
-            response_variable: p_ans_spam
-          - action: input_text.set_value
-            target:
-              entity_id: '{{ p_helper }}'
-            data:
-              value: '{{ (p_ans_spam.values() | first).conversation_message_id }}'
+                  entity_id: "{{ vk_target }}"
+                  title: "⛅ Прогноз на сутки"
+                  message: "{{ morning_msg }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                  keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                  parse_mode: html
+                response_variable: m_ans_spam
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ m_helper }}"
+                data:
+                  value: "{{ (m_ans_spam.values() | first).conversation_message_id }}"
+
       - conditions:
-        - condition: template
-          value_template: '{{ rain_list == '''' and p_id != '''' }}'
+          - condition: template
+            value_template: "{{ p_enabled }}"
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: monitor_trigger
+              - condition: template
+                value_template: "{{ trigger is not defined or trigger.platform is none }}"
         sequence:
-        - choose:
-          - conditions:
-            - condition: template
-              value_template: '{{ p_mode == ''edit'' }}'
-            sequence:
-            - action: vk_notify.edit_message
-              continue_on_error: true
-              data:
-                entity_id: '{{ vk_target }}'
-                message: "<b>✅ Оперативный мониторинг</b>\nОсадков в ближайшие 3 часа не ожидается. Небо прояснилось! 🌤\n🌡 Сейчас: <b>{{ weather_data[weather_entity].forecast[0].temperature }}°C</b>\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
-                conversation_message_id: '{{ p_id | int(0) }}'
-                keyboard:
-                  inline: true
-                  buttons: []
-                parse_mode: html
-          - conditions:
-            - condition: template
-              value_template: '{{ p_mode == ''delete'' }}'
-            sequence:
-            - action: vk_notify.delete_message
-              continue_on_error: true
-              data:
-                entity_id: '{{ vk_target }}'
-                conversation_message_id: '{{ p_id | int(0) }}'
-        - action: input_text.set_value
-          target:
-            entity_id: '{{ p_helper }}'
-          data:
-            value: ''
+          - variables:
+              rain_list: >-
+                {% set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] %}
+                {% set mapper = {'rainy': 'Дождь 🌧', 'pouring': 'Ливень ⛈', 'lightning-rainy': 'Гроза ⛈', 'snowy-rainy': 'Снег с дождем 💧❄️', 'snowy': 'Снег ❄️', 'hail': 'Град 🌨'} %}
+                {% set fc = weather_data[weather_entity].forecast %}
+                {% set t_current = fc[0].temperature %}
+                {% set ns = namespace(out="", count=0, min_temp=50) %}
+                {% for h in fc if (as_timestamp(h.datetime, 0) + 3600) > as_timestamp(now(), 0) %}
+                  {% if ns.count < 3 %}
+                    {% if h.condition in bad_weather %}
+                      {% set ns.out = ns.out ~ "🕒 <b>" ~ (as_timestamp(h.datetime, 0) | timestamp_custom('%H:%M')) ~ "</b> — " ~ mapper.get(h.condition, h.condition) ~ " (" ~ h.temperature ~ "°C)\n" %}
+                      {% if h.temperature | float < ns.min_temp %}{% set ns.min_temp = h.temperature | float %}{% endif %}
+                    {% endif %}
+                    {% set ns.count = ns.count + 1 %}
+                  {% endif %}
+                {% endfor %}
+                {% if ns.out != "" %}
+                  {% set ns.out = "🌡 Сейчас: <b>" ~ t_current ~ "°C</b>\n\n" ~ ns.out %}
+                  {% if ns.min_temp <= 7 %}
+                    {% set ns.out = ns.out ~ "\n🥶 <b>Холодно и сыро.</b> Надеюсь, вы тепло одеты и зонт с вами!" %}
+                  {% else %}
+                    {% set ns.out = ns.out ~ "\n☂️ Не забудьте взять зонт!" %}
+                  {% endif %}
+                {% endif %} {{ ns.out | trim }}
+              vk_kb: >-
+                {% if map_link != '' %} {"inline": true, "buttons": [[{"action": {"type": "open_link", "link": "{{ map_link }}", "label": "🗺 Карта осадков"}}]]} {% else %}null{% endif %}
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ rain_list != '' }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'edit' and p_id != '' }}"
+                        sequence:
+                          - action: vk_notify.edit_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              message: "<b>⛅ Оперативный прогноз</b>\nВ ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                              keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                              parse_mode: html
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'delete' }}"
+                        sequence:
+                          - if:
+                              - condition: template
+                                value_template: "{{ p_id != '' }}"
+                            then:
+                              - action: vk_notify.delete_message
+                                continue_on_error: true
+                                data:
+                                  entity_id: "{{ vk_target }}"
+                                  conversation_message_id: "{{ p_id | int(0) }}"
+                          - action: vk_notify.send_message
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              title: "⛅ Оперативный прогноз"
+                              message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                              keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                              parse_mode: html
+                            response_variable: p_ans_del
+                          - action: input_text.set_value
+                            target:
+                              entity_id: "{{ p_helper }}"
+                            data:
+                              value: "{{ (p_ans_del.values() | first).conversation_message_id }}"
+                    default:
+                      - action: vk_notify.send_message
+                        data:
+                          entity_id: "{{ vk_target }}"
+                          title: "⛅ Оперативный прогноз"
+                          message: "В ближайшие 3 часа ожидаются осадки:\n{{ rain_list }}\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                          keyboard: "{{ vk_kb | from_json if (vk_kb | trim) != 'null' else omit }}"
+                          parse_mode: html
+                        response_variable: p_ans_spam
+                      - action: input_text.set_value
+                        target:
+                          entity_id: "{{ p_helper }}"
+                        data:
+                          value: "{{ (p_ans_spam.values() | first).conversation_message_id }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ rain_list == '' and p_id != '' }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'edit' }}"
+                        sequence:
+                          - action: vk_notify.edit_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              message: "<b>✅ Оперативный мониторинг</b>\nОсадков в ближайшие 3 часа не ожидается. Небо прояснилось! 🌤\n🌡 Сейчас: <b>{{ weather_data[weather_entity].forecast[0].temperature }}°C</b>\n\n🔄 <i>Обновлено: {{ now().strftime('%H:%M:%S') }}</i>"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                              keyboard:
+                                inline: true
+                                buttons: []
+                              parse_mode: html
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ p_mode == 'delete' }}"
+                        sequence:
+                          - action: vk_notify.delete_message
+                            continue_on_error: true
+                            data:
+                              entity_id: "{{ vk_target }}"
+                              conversation_message_id: "{{ p_id | int(0) }}"
+                  - action: input_text.set_value
+                    target:
+                      entity_id: "{{ p_helper }}"
+                    data:
+                      value: ""
+
+mode: single

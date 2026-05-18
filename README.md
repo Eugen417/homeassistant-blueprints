@@ -1,3 +1,4 @@
+[![Проверка Blueprints](https://github.com/Eugen417/homeassistant-blueprints/actions/workflows/ha-validate.yml/badge.svg)](https://github.com/Eugen417/homeassistant-blueprints/actions/workflows/ha-validate.yml)
 # 🏠 Home Assistant Blueprints by Eugen417
 
 Коллекция чертежей (blueprints) и скриптов для Home Assistant.

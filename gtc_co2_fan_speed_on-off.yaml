@@ -95,7 +95,7 @@ blueprint:
       selector:
         number: { min: 400, max: 1000, step: 1, mode: box, unit_of_measurement: ppm }
     max_speed:
-      name: 📶💨 Максимальная скорость вентилятора (%)
+      name: 📶💨 Максимальная скорость вентилатора (%)
       default: 40
       selector:
         number: { min: 10, max: 100, step: 10, mode: slider, unit_of_measurement: '%' }
@@ -151,9 +151,9 @@ action:
 
       current_mode: "{{ states(mode_select_entity_id) }}"
       is_fan_on: "{{ is_state(target_fan_entity, 'on') }}"
-      min_fan_speed: >
+      min_fan_speed: >-
         {% if start_speed_val | float == 0 %} 10 {% else %} {{ start_speed_val }} {% endif %}
-      avg_co2: >
+      avg_co2: >-
         {% set valid = co2_sensors_list | map('states') | map('float',0) | select('>',0) | list %}
         {% if valid | length > 0 %} {{ (valid | sum / valid | length) | round(1) }} {% else %} 0 {% endif %}
       current_speed: "{{ state_attr(target_fan_entity, 'percentage') | float(0) }}"
@@ -183,29 +183,28 @@ action:
                   - condition: template
                     value_template: "{{ not is_fan_on }}"
                   - condition: template
-                    value_template: >
-                      {{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}
+                    value_template: "{{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}"
                   - condition: template
                     value_template: "{{ current_mode == 'RUNNING' }}"
                 sequence:
                   - variables:
-                      initial_speed: >
+                      initial_speed: >-
                         {% if is_fast_mode %} {{ max_speed_val }} {% else %} {{ min_fan_speed }} {% endif %}
-                  - target:
+                  - action: fan.turn_on
+                    target:
                       entity_id: "{{ target_fan_entity }}"
-                    service: fan.turn_on
                   - delay:
                       seconds: 50
-                  - target:
+                  - action: fan.set_percentage
+                    target:
                       entity_id: "{{ target_fan_entity }}"
                     data:
                       percentage: "{{ initial_speed | float(10) | round(0) }}"
-                    service: fan.set_percentage
-                  - target:
+                  - action: input_select.select_option
+                    target:
                       entity_id: "{{ mode_select_entity_id }}"
                     data:
                       option: WAITING
-                    service: input_select.select_option
 
               - conditions:
                   - condition: template
@@ -220,42 +219,41 @@ action:
                               - condition: template
                                 value_template: "{{ start_speed_val | float == 0 }}"
                             then:
-                              - target:
+                              - action: fan.set_percentage
+                                target:
                                   entity_id: "{{ target_fan_entity }}"
                                 data:
                                   percentage: 10
-                                service: fan.set_percentage
                               - delay:
                                   seconds: 5
-                              - target:
+                              - action: fan.turn_off
+                                target:
                                   entity_id: "{{ target_fan_entity }}"
-                                service: fan.turn_off
-                              - target:
+                              - action: input_select.select_option
+                                target:
                                   entity_id: "{{ mode_select_entity_id }}"
                                 data:
                                   option: RUNNING
-                                service: input_select.select_option
                             else:
-                              - target:
+                              - action: fan.set_percentage
+                                target:
                                   entity_id: "{{ target_fan_entity }}"
                                 data:
                                   percentage: "{{ start_speed_val }}"
-                                service: fan.set_percentage
 
                       - conditions:
                           - condition: template
                             value_template: "{{ not is_fast_mode }}"
                           - condition: template
-                            value_template: >
-                              {{ (previous_co2 - avg_co2) >= co2_change_threshold_val | float }}
+                            value_template: "{{ (previous_co2 - avg_co2) >= co2_change_threshold_val | float }}"
                         sequence:
                           - variables:
                               new_speed: "{{ [current_speed - 10, min_fan_speed] | max }}"
-                          - target:
+                          - action: fan.set_percentage
+                            target:
                               entity_id: "{{ target_fan_entity }}"
                             data:
                               percentage: "{{ new_speed }}"
-                            service: fan.set_percentage
 
                       - conditions:
                           - condition: template
@@ -265,11 +263,11 @@ action:
                         sequence:
                           - variables:
                               new_speed: "{{ [current_speed + 10, max_speed_val] | min }}"
-                          - target:
+                          - action: fan.set_percentage
+                            target:
                               entity_id: "{{ target_fan_entity }}"
                             data:
                               percentage: "{{ new_speed }}"
-                            service: fan.set_percentage
 
                       - conditions:
                           - condition: template
@@ -281,15 +279,16 @@ action:
                               - condition: template
                                 value_template: "{{ current_speed < max_speed_val }}"
                             then:
-                              - target:
+                              - action: fan.set_percentage
+                                target:
                                   entity_id: "{{ target_fan_entity }}"
                                 data:
                                   percentage: "{{ max_speed_val }}"
-                                service: fan.set_percentage
-          - data:
+          - action: input_number.set_value
+            target:
               entity_id: "{{ previous_co2_helper_entity_id }}"
+            data:
               value: "{{ avg_co2 }}"
-            service: input_number.set_value
 
       # --- БЛОК 2: daily_alert (ежедневное оповещение) ---
       - conditions:
@@ -299,8 +298,7 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: >
-                      {{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}
+                    value_template: "{{ avg_co2 >= (low_co2_max_val | float + co2_increase_threshold_val | float) }}"
                   - condition: template
                     value_template: "{{ not is_fan_on }}"
                   - condition: template
@@ -308,10 +306,10 @@ action:
                   - condition: template
                     value_template: "{{ target_chat_ids | length > 0 }}"
                 sequence:
-                  - service: telegram_bot.send_message
+                  - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ target_chat_ids }}"
-                      message: >
+                      message: >-
                         {%- set message_title = "💨 \*Внимание: Блокировка Вентустановки\*" %}
                         {%- set co2_turn_on_threshold_calculated = ((low_co2_max_val | float + co2_increase_threshold_val | float) | round(0)) -%}
                         {%- set fast_mode_status = "Быстрый режим: " ~ ("ON" if is_fast_mode else "OFF") %}
@@ -320,17 +318,17 @@ action:
                         {{ message_title ~ "\n\n" ~ escaped_body }}
                       parse_mode: markdownv2
                       inline_keyboard:
-                        - "ВКЛЮЧИТЬ FAN:/turn_on_{{ target_fan_entity.split('.')[-1] }}"
+                        - - "ВКЛЮЧИТЬ FAN:/turn_on_{{ target_fan_entity.split('.')[-1] }}"
 
       # --- БЛОК 3: telegram_callback (ручное включение) ---
       - conditions:
           - condition: trigger
             id: telegram_callback
         sequence:
-          - service: telegram_bot.answer_callback_query
+          - action: telegram_bot.answer_callback_query
             data:
               callback_query_id: "{{ trigger.event.data.id }}"
-              message: Проверяю статус gtc_fan и режим автоматики...
+              message: "Проверяю статус gtc_fan и режим автоматики..."
               show_alert: false
           - choose:
               - conditions:
@@ -339,14 +337,11 @@ action:
                   - condition: template
                     value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
                 sequence:
-                  - alias: Автоматизация уже работает
-                    service: telegram_bot.send_message
+                  - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ trigger.event.data.chat_id }}"
-                      message: >
-                        ℹ️ Вентилятор <b>{{ target_fan_entity.split('.')[-1] }}</b> уже включен! Скорость:
-                        <b>{{ state_attr(target_fan_entity, 'percentage') }}%</b>.
-                        Автоматизация активна (режим: {{ states(mode_select_entity_id) }}). Включение не требуется. (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)
+                      message: >-
+                        ℹ️ Вентилятор <b>{{ target_fan_entity.split('.')[-1] }}</b> уже включен! Скорость: <b>{{ state_attr(target_fan_entity, 'percentage') }}%</b>. Автоматизация активна (режим: {{ states(mode_select_entity_id) }}). Включение не требуется. (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)
                       parse_mode: html
 
               - conditions:
@@ -355,14 +350,12 @@ action:
                   - condition: template
                     value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
                   - condition: template
-                    value_template: >
-                      {{ states(previous_co2_helper_entity_id) | float(0) < (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}
+                    value_template: "{{ states(previous_co2_helper_entity_id) | float(0) < (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}"
                 sequence:
-                  - alias: Установка в режиме ожидания (CO2 низкий)
-                    service: telegram_bot.send_message
+                  - action: telegram_bot.send_message
                     data:
                       chat_id: "{{ trigger.event.data.chat_id }}"
-                      message: >
+                      message: >-
                         ℹ️ Установка находится в режиме ожидания (<b>{{ states(mode_select_entity_id) }}</b>). Уровень CO2 ({{ states(previous_co2_helper_entity_id) }} ppm) ниже порога ({{ (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) | round(0) }} ppm). Включение вручную не требуется. (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)
                       parse_mode: html
 
@@ -372,11 +365,9 @@ action:
                   - condition: template
                     value_template: "{{ current_mode in ['WAITING', 'RUNNING'] }}"
                   - condition: template
-                    value_template: >
-                      {{ states(previous_co2_helper_entity_id) | float(0) >= (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}
+                    value_template: "{{ states(previous_co2_helper_entity_id) | float(0) >= (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) }}"
                 sequence:
-                  - alias: "Включение - Шаг 1: Первая попытка"
-                    service: fan.turn_on
+                  - action: fan.turn_on
                     target:
                       entity_id: "{{ target_fan_entity }}"
                   - delay: "00:00:50"
@@ -385,11 +376,11 @@ action:
                           - condition: template
                             value_template: "{{ not is_state(target_fan_entity, 'on') }}"
                         sequence:
-                          - service: telegram_bot.send_message
+                          - action: telegram_bot.send_message
                             data:
                               chat_id: "{{ trigger.event.data.chat_id }}"
-                              message: Попытка включения 1: не удалось ❌. Пробую повторно...
-                          - service: fan.turn_on
+                              message: "Попытка включения 1: не удалось ❌. Пробую повторно..."
+                          - action: fan.turn_on
                             target:
                               entity_id: "{{ target_fan_entity }}"
                           - delay: "00:00:50"
@@ -401,44 +392,45 @@ action:
                             value_template: "{{ is_state(target_fan_entity, 'on') }}"
                         sequence:
                           - variables:
-                              initial_speed: >
+                              initial_speed: >-
                                 {% if is_fast_mode %} {{ max_speed_val }} {% else %} {{ min_fan_speed }} {% endif %}
-                          - target:
+                          - action: fan.set_percentage
+                            target:
                               entity_id: "{{ target_fan_entity }}"
                             data:
                               percentage: "{{ initial_speed | float(10) | round(0) }}"
-                            service: fan.set_percentage
-                          - service: input_select.select_option
-                            data:
+                          - action: input_select.select_option
+                            target:
                               entity_id: "{{ mode_select_entity_id }}"
+                            data:
                               option: RUNNING
                             enabled: false
-                          - service: telegram_bot.send_message
+                          - action: telegram_bot.send_message
                             data:
                               chat_id: "{{ trigger.event.data.chat_id }}"
-                              message: ✅ {{ target_fan_entity.split('.')[-1] }} включен! Автоматизация завершена успешно. (Запущен в **{{ 'быстром' if is_fast_mode else 'автоматическом' }}** режиме).
+                              message: "✅ {{ target_fan_entity.split('.')[-1] }} включен! Автоматизация завершена успешно. (Запущен в **{{ 'быстром' if is_fast_mode else 'автоматическом' }}** режиме)."
                             parse_mode: html
                       - conditions:
                           - condition: template
                             value_template: "{{ not is_state(target_fan_entity, 'on') }}"
                         sequence:
-                          - service: telegram_bot.send_message
+                          - action: telegram_bot.send_message
                             data:
                               chat_id: "{{ trigger.event.data.chat_id }}"
-                              message: ❌ <b>{{ target_fan_entity.split('.')[-1] }}</b> не включился после двух попыток! Требуется ручная проверка устройства.
+                              message: "❌ <b>{{ target_fan_entity.split('.')[-1] }}</b> не включился после двух попыток! Требуется ручная проверка устройства."
                             parse_mode: html
 
               default:
-                - alias: Невозможно включить/Неизвестный статус
-                  service: telegram_bot.send_message
+                - action: telegram_bot.send_message
                   data:
                     chat_id: "{{ trigger.event.data.chat_id }}"
                     message: "⚠️ Установка не может быть включена (Текущий режим: <b>{{ states(mode_select_entity_id) }}</b>). Вентилятор: <b>{{ states(target_fan_entity) }}</b>. Текущий CO2: <b>{{ states(previous_co2_helper_entity_id) }} ppm</b>. Порог включения: <b>{{ (low_co2_max_val | float(0) + co2_increase_threshold_val | float(0)) | round(0) }} ppm</b>.\n (Быстрый режим: **{{ 'ON' if is_fast_mode else 'OFF' }}**)"
                   parse_mode: html
 
-          - service: input_number.set_value
-            data:
+          - action: input_number.set_value
+            target:
               entity_id: "{{ previous_co2_helper_entity_id }}"
+            data:
               value: "{{ avg_co2 }}"
 
 mode: single

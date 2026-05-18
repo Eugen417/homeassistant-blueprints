@@ -1,0 +1,814 @@
+blueprint:
+  name: 💧 Уведомление о протечке v16.7 (VK HTML + Max HTML + Telegram + Имена кранов)
+  description: >-
+    Устранены ошибки YAML (исправлен синтаксис PUSH mobile_app).
+    Заменен устаревший параметр target на chat_id.
+    Добавлена поддержка нативных служб max_notify.send_message и vk_notify.send_message
+    с полноценным HTML-форматированием, заголовками и отключением упоминаний.
+    Добавлен вывод конкретных названий перекрываемых кранов в текстовые и голосовые уведомления.
+  domain: automation
+  
+  input:
+    zone_1_name:
+      name: Название Зоны 1
+      default: 'Кухня'
+      selector:
+        text:
+    leak_sensors_zone_1:
+      name: Датчики Зоны 1
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: moisture
+          multiple: true
+      default: []
+    water_shutoff_devices_zone_1:
+      name: Краны Зоны 1
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+      default: []
+    zone_2_name:
+      name: Название Зоны 2
+      default: 'Ванная'
+      selector:
+        text:
+    leak_sensors_zone_2:
+      name: Датчики Зоны 2
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: moisture
+          multiple: true
+      default: []
+    water_shutoff_devices_zone_2:
+      name: Краны Зоны 2
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+      default: []
+    zone_3_name:
+      name: Название Зоны 3
+      default: 'Душевая'
+      selector:
+        text:
+    leak_sensors_zone_3:
+      name: Датчики Зоны 3
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: moisture
+          multiple: true
+      default: []
+    water_shutoff_devices_zone_3:
+      name: Краны Зоны 3
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+      default: []
+    zone_4_name:
+      name: Название Зоны 4
+      default: 'Отопление'
+      selector:
+        text:
+    leak_sensors_zone_4:
+      name: Датчики Зоны 4
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: moisture
+          multiple: true
+      default: []
+    water_shutoff_devices_zone_4:
+      name: Краны Зоны 4
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+      default: []
+    notify_device:
+      name: Устройство для PUSH (Мобильное приложение)
+      selector:
+        device:
+          integration: mobile_app
+    telegram_notify_target:
+      name: 💬 Telegram Notify Entity
+      description: "Выберите сущности: notify.telegram_bot_..."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+    vk_notify_target:
+      name: "💬 VK Notify"
+      description: "Выберите сущности VK Notify. Отправка будет с HTML-разметкой."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+    max_notify_target:
+      name: "💬 Max Notify"
+      description: "Выберите сущности Max Notify. Отправка в формате HTML."
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+            - domain: notify
+    notification_title:
+      name: Заголовок
+      default: '💧 ОБНАРУЖЕНА ПРОТЕЧКА!'
+      selector:
+        text:
+    tts_media_players:
+      name: Медиаплееры TTS
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+      default: []
+    tts_service:
+      name: Сервис TTS
+      default: tts.yandex_station_say
+      selector:
+        text:
+    tts_volume:
+      name: Громкость TTS
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+          mode: slider
+      default: 0.7
+    tts_delay_after_leak_message:
+      name: Задержка проверки кранов (сек)
+      description: Время между сообщением о протечке и проверкой, закрылись ли краны.
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          mode: slider
+      default: 11
+    tts_delay_between_runs:
+      name: Задержка между запусками
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          mode: slider
+      default: 5
+    custom_action:
+      name: Дополнительные действия (Сирена, свет и т.д.)
+      description: "(Необязательно) Любые действия, которые нужно выполнить немедленно при обнаружении протечки."
+      default: []
+      selector:
+        action: {}
+
+variables:
+  telegram_input: !input telegram_notify_target
+  vk_input: !input vk_notify_target
+  max_input: !input max_notify_target
+  notif_title: !input notification_title
+  
+  target_chat_ids: >
+    {% set selected_entities_raw = telegram_input.entity_id | default([]) %} 
+    {% set selected_entities = [selected_entities_raw] | flatten %} 
+    {% set chat_id_strings = selected_entities | map('regex_replace', find='^.+_', replace='') | list %} 
+    {% set ns = namespace(target_ids=[]) %} 
+    {% for id_string in chat_id_strings %}
+      {% set cleaned_id = id_string | string | trim %}
+      {% if cleaned_id | length > 10 and not cleaned_id.startswith('-') %}
+        {% set id_with_hyphen = '-' ~ cleaned_id %}
+        {% set ns.target_ids = ns.target_ids + [id_with_hyphen] %}
+      {% else %}
+        {% set ns.target_ids = ns.target_ids + [cleaned_id] %}
+      {% endif %}
+    {% endfor %} 
+    {{ ns.target_ids }}
+    
+  vk_targets: >-
+    {% set raw = vk_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+    
+  max_targets: >-
+    {% set raw = max_input.entity_id | default([]) %}
+    {{ [raw] | flatten | reject('==', '') | list }}
+
+trigger:
+  - platform: state
+    entity_id: !input 'leak_sensors_zone_1'
+    to: 'on'
+    alias: Протечка в первой зоне
+  - platform: state
+    entity_id: !input 'leak_sensors_zone_2'
+    to: 'on'
+    alias: Протечка во второй зоне
+  - platform: state
+    entity_id: !input 'leak_sensors_zone_3'
+    to: 'on'
+    alias: Протечка в третьей зоне
+  - platform: state
+    entity_id: !input 'leak_sensors_zone_4'
+    to: 'on'
+    alias: Протечка в четвертой зоне
+
+condition:
+  - condition: template
+    value_template: "{{ trigger.to_state.state != 'unknown' }}"
+  - condition: template
+    value_template: "{{ trigger.from_state.state != 'unknown' }}"
+
+action:
+  - parallel:
+      - sequence:
+          - choose: []
+            default: !input custom_action
+
+      - sequence:
+          - choose:
+              # ================= ЗОНА 1 =================
+              - conditions: "{{ trigger.alias == 'Протечка в первой зоне' }}"
+                sequence:
+                  - variables:
+                      zone: !input 'zone_1_name'
+                      valves: !input 'water_shutoff_devices_zone_1'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                      valve_names: "{{ expand(valves) | map(attribute='name') | list | join(', ') }}"
+                  
+                  - action: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю: {{ valve_names }}{% endif %}"
+
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - action: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                              parse_mode: html
+                              
+                  - if: "{{ max_targets | length > 0 }}"
+                    then:
+                      - action: max_notify.send_message
+                        target:
+                          entity_id: "{{ max_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          format: html
+                          
+                  - if: "{{ vk_targets | length > 0 }}"
+                    then:
+                      - action: vk_notify.send_message
+                        target:
+                          entity_id: "{{ vk_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          parse_mode: html
+                          disable_mentions: true
+
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      volume_level: !input 'tts_volume'
+                  - action: !input 'tts_service'
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      message: "Внимание! Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. {% if valves | length > 0 %}Закрываю: {{ valve_names }}.{% endif %}"
+
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Успешно перекрыто: {{ valve_names }} в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "✅ <b>УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "✅ УСПЕШНО: Перекрыто: {{ valve_names }} (Зона: {{ zone }})."
+
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Внимание! Ошибка закрытия в зоне {{ zone }}. Проверьте: {{ failed }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: <b>{{ failed }}</b>"
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "🚨 <b>ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "🚨 ОШИБКА: Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+
+              # ================= ЗОНА 2 =================
+              - conditions: "{{ trigger.alias == 'Протечка во второй зоне' }}"
+                sequence:
+                  - variables:
+                      zone: !input 'zone_2_name'
+                      valves: !input 'water_shutoff_devices_zone_2'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                      valve_names: "{{ expand(valves) | map(attribute='name') | list | join(', ') }}"
+                  - action: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю: {{ valve_names }}{% endif %}"
+
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - action: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                              parse_mode: html
+
+                  - if: "{{ max_targets | length > 0 }}"
+                    then:
+                      - action: max_notify.send_message
+                        target:
+                          entity_id: "{{ max_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          format: html
+                          
+                  - if: "{{ vk_targets | length > 0 }}"
+                    then:
+                      - action: vk_notify.send_message
+                        target:
+                          entity_id: "{{ vk_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          parse_mode: html
+                          disable_mentions: true
+
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      volume_level: !input 'tts_volume'
+                  - action: !input 'tts_service'
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      message: "Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. {% if valves | length > 0 %}Закрываю: {{ valve_names }}.{% endif %}"
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Успешно перекрыто: {{ valve_names }} в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "✅ <b>УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "✅ УСПЕШНО: Перекрыто: {{ valve_names }} (Зона: {{ zone }})."
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Внимание! Ошибка закрытия в зоне {{ zone }}. Проверьте: {{ failed }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: <b>{{ failed }}</b>"
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "🚨 <b>ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "🚨 ОШИБКА: Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+
+              # ================= ЗОНА 3 =================
+              - conditions: "{{ trigger.alias == 'Протечка в третьей зоне' }}"
+                sequence:
+                  - variables:
+                      zone: !input 'zone_3_name'
+                      valves: !input 'water_shutoff_devices_zone_3'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                      valve_names: "{{ expand(valves) | map(attribute='name') | list | join(', ') }}"
+                  - action: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю: {{ valve_names }}{% endif %}"
+
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - action: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                              parse_mode: html
+                              
+                  - if: "{{ max_targets | length > 0 }}"
+                    then:
+                      - action: max_notify.send_message
+                        target:
+                          entity_id: "{{ max_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          format: html
+                          
+                  - if: "{{ vk_targets | length > 0 }}"
+                    then:
+                      - action: vk_notify.send_message
+                        target:
+                          entity_id: "{{ vk_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          parse_mode: html
+                          disable_mentions: true
+
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      volume_level: !input 'tts_volume'
+                  - action: !input 'tts_service'
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      message: "Обнаружена протечка в зоне {{ zone }} от датчика {{ sensor_name }}. {% if valves | length > 0 %}Закрываю: {{ valve_names }}.{% endif %}"
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Успешно перекрыто: {{ valve_names }} в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "✅ <b>УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "✅ УСПЕШНО: Перекрыто: {{ valve_names }} (Зона: {{ zone }})."
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Внимание! Ошибка закрытия в зоне {{ zone }}. Проверьте: {{ failed }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: <b>{{ failed }}</b>"
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "🚨 <b>ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "🚨 ОШИБКА: Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+
+              # ================= ЗОНА 4 =================
+              - conditions: "{{ trigger.alias == 'Протечка в четвертой зоне' }}"
+                sequence:
+                  - variables:
+                      zone: !input 'zone_4_name'
+                      valves: !input 'water_shutoff_devices_zone_4'
+                      sensor_name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) | replace(' water leak', '') | replace(' Water leak detected', '') | replace(' Water Leak', '') }}"
+                      valve_names: "{{ expand(valves) | map(attribute='name') | list | join(', ') }}"
+                  - action: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ valves }}"
+                  
+                  - if: "{{ notify_device is not none }}"
+                    then:
+                      - domain: mobile_app
+                        type: notify
+                        device_id: !input notify_device
+                        title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                        message: "⚠️ Зона: {{ zone }}. Датчик: {{ sensor_name }}.\n{% if valves | length > 0 %}🚰 Закрываю: {{ valve_names }}{% endif %}"
+
+                  - choose:
+                      - conditions: "{{ target_chat_ids | length > 0 }}"
+                        sequence:
+                          - action: telegram_bot.send_message
+                            data:
+                              chat_id: '{{ target_chat_ids }}'
+                              message: "<b>{{ notif_title }}</b>\n⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                              parse_mode: html
+                              
+                  - if: "{{ max_targets | length > 0 }}"
+                    then:
+                      - action: max_notify.send_message
+                        target:
+                          entity_id: "{{ max_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          format: html
+                          
+                  - if: "{{ vk_targets | length > 0 }}"
+                    then:
+                      - action: vk_notify.send_message
+                        target:
+                          entity_id: "{{ vk_targets }}"
+                        data:
+                          title: "{{ notif_title | replace('<b>', '') | replace('</b>', '') }}"
+                          message: "⚠️ Зона: <b>{{ zone }}</b>. Датчик: <b>{{ sensor_name }}</b>.\n{% if valves | length > 0 %}🚰 Закрываю: <b>{{ valve_names }}</b>{% endif %}"
+                          parse_mode: html
+                          disable_mentions: true
+
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      volume_level: !input 'tts_volume'
+                  - action: !input 'tts_service'
+                    target:
+                      entity_id: !input 'tts_media_players'
+                    data:
+                      message: "Внимание! Протечка в зоне {{ zone }} от датчика {{ sensor_name }}. {% if valves | length > 0 %}Закрываю: {{ valve_names }}.{% endif %}"
+                  - delay:
+                      seconds: !input 'tts_delay_after_leak_message'
+                  - choose:
+                      - conditions: "{{ valves | select('is_state', 'off') | list | length == valves | length }}"
+                        sequence:
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Успешно перекрыто: {{ valve_names }} в зоне {{ zone }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>✅ УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "✅ <b>УСПЕШНО:</b> Перекрыто: <b>{{ valve_names }}</b> (Зона: {{ zone }})."
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "✅ УСПЕШНО: Перекрыто: {{ valve_names }} (Зона: {{ zone }})."
+                      - conditions: "{{ valves | length > 0 }}"
+                        sequence:
+                          - variables:
+                              failed: "{{ expand(valves) | selectattr('state','ne','off') | map(attribute='name') | list | join(', ') }}"
+                          - action: !input 'tts_service'
+                            target:
+                              entity_id: !input 'tts_media_players'
+                            data:
+                              message: "Внимание! Ошибка закрытия в зоне {{ zone }}. Проверьте: {{ failed }}."
+                          - choose:
+                              - conditions: "{{ target_chat_ids | length > 0 }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      chat_id: '{{ target_chat_ids }}'
+                                      message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>: <b>{{ failed }}</b>"
+                                      parse_mode: html
+                          - if: "{{ max_targets | length > 0 }}"
+                            then:
+                              - action: max_notify.send_message
+                                target:
+                                  entity_id: "{{ max_targets }}"
+                                data:
+                                  message: "<b>🚨 ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  format: html
+                          - if: "{{ vk_targets | length > 0 }}"
+                            then:
+                              - action: vk_notify.send_message
+                                target:
+                                  entity_id: "{{ vk_targets }}"
+                                data:
+                                  message: "🚨 <b>ОШИБКА:</b> Не закрыты краны в зоне <b>{{ zone }}</b>:\n<b>{{ failed }}</b>"
+                                  parse_mode: html
+                                  disable_mentions: true
+                          - if: "{{ notify_device is not none }}"
+                            then:
+                              - domain: mobile_app
+                                type: notify
+                                device_id: !input notify_device
+                                message: "🚨 ОШИБКА: Не закрыты краны в зоне {{ zone }}: {{ failed }}"
+
+  - delay:
+      seconds: !input 'tts_delay_between_runs'
+
+mode: queued
+max: 10

@@ -120,7 +120,7 @@ action:
   - variables:
       telegram_notifications_id: !input telegram_notifications
       tracked_persons_ids: !input tracked_persons
-      all_command: "/gde_vse" # Команда для запроса всех
+      all_command: "/gde_vse"  # Команда для запроса всех
 
       # --- АВТОМАТИЧЕСКОЕ ИЗВЛЕЧЕНИЕ ID ЧАТА ИЗ notify.xxx ---
       notify_target_id: >-
@@ -277,7 +277,7 @@ action:
                       latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                       longitude: "{{ state_attr(target_person_id, 'longitude') }}"
 
-              # Если координат НЕТ
+              # Если координаты НЕТ
               - conditions:
                   - condition: template
                     value_template: "{{ state_attr(target_person_id, 'latitude') is none }}"
@@ -353,7 +353,7 @@ action:
                             latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                             longitude: "{{ state_attr(target_person_id, 'longitude') }}"
 
-                    # Если координат НЕТ
+                    # Если координаты НЕТ
                     - conditions:
                         - condition: template
                           value_template: "{{ state_attr(target_person_id, 'latitude') is none }}"
@@ -423,7 +423,7 @@ action:
                             latitude: "{{ state_attr(target_person_id, 'latitude') }}"
                             longitude: "{{ state_attr(target_person_id, 'longitude') }}"
 
-                    # Если координат НЕТ
+                    # Если координаты НЕТ
                     - conditions:
                         - condition: template
                           value_template: "{{ state_attr(target_person_id, 'latitude') is none }}"

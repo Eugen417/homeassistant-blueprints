@@ -6,15 +6,17 @@ on:
       - main
       - master
     paths:
-      - '**.yaml'
-      - '**.yml'
+      - 'automation/**.yaml'
+      - 'script/**.yaml'
+      - '.github/workflows/ha-validate.yml'
   pull_request:
     branches:
       - main
       - master
     paths:
-      - '**.yaml'
-      - '**.yml'
+      - 'automation/**.yaml'
+      - 'script/**.yaml'
+      - '.github/workflows/ha-validate.yml'
 
 # Успокаиваем GitHub и переходим на новый Node.js
 env:
@@ -54,8 +56,19 @@ jobs:
 
       - name: Подготовка тестовой среды HA
         run: |
+          # Создаем изолированные папки под каждый тип блюпринтов
           mkdir -p fake_config/blueprints/automation/test
-          find . -type f -name "*.yaml" -not -path "*/\.github/*" -exec cp {} fake_config/blueprints/automation/test/ \;
+          mkdir -p fake_config/blueprints/script/test
+          
+          # Копируем только файлы из новых папок, игнорируя файлы в корне репозитория
+          if [ -d "automation" ]; then
+            find automation/ -type f -name "*.yaml" -exec cp {} fake_config/blueprints/automation/test/ \;
+          fi
+          
+          if [ -d "script" ]; then
+            find script/ -type f -name "*.yaml" -exec cp {} fake_config/blueprints/script/test/ \;
+          fi
+          
           echo "default_config:" > fake_config/configuration.yaml
 
       - name: Проверка конфигурации через HA CLI

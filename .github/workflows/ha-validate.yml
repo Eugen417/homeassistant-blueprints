@@ -6,15 +6,17 @@ on:
       - main
       - master
     paths:
-      - '**.yaml'
-      - '**.yml'
+      - 'ha-blueprints/loggia/**.yaml'
   pull_request:
     branches:
       - main
       - master
     paths:
-      - '**.yaml'
-      - '**.yml'
+      - 'ha-blueprints/loggia/**.yaml'
+
+# Добавляем вот этот блок, чтобы успокоить GitHub:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   yamllint:

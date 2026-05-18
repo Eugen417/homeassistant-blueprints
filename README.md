@@ -1,7 +1,7 @@
-[![Проверка Blueprints](https://img.shields.io/github/actions/workflow/status/Eugen417/homeassistant-blueprints/ha-validate.yml?style=for-the-badge&label=Проверка%20Blueprints)](https://github.com/Eugen417/homeassistant-blueprints/actions/workflows/ha-validate.yml)
+[![Проверка Blueprints](https://img.shields.io/github/actions/workflow/status/Eugen417/homeassistant-blueprints/ha-validate.yml?style=for-the-badge&label=Проверка%20Blueprints&logo=github)](https://github.com/Eugen417/homeassistant-blueprints/actions/workflows/ha-validate.yml)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-compatible-blue.svg?style=for-the-badge&logo=home-assistant)](https://www.home-assistant.io/)
 [![Blueprint](https://img.shields.io/badge/Type-Blueprint-15A9CE.svg?style=for-the-badge)](https://www.home-assistant.io/docs/automation/using_blueprints/)
-[![GitHub Stars](https://img.shields.io/github/stars/Eugen417/homeassistant-blueprints.svg?style=for-the-badge)](https://github.com/Eugen417/homeassistant-blueprints/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/Eugen417/homeassistant-blueprints.svg?style=for-the-badge&logo=github)](https://github.com/Eugen417/homeassistant-blueprints/stargazers)
 [![License](https://img.shields.io/github/license/Eugen417/homeassistant-blueprints.svg?style=for-the-badge)](https://github.com/Eugen417/homeassistant-blueprints/blob/main/LICENSE)
 # 🏠 Home Assistant Blueprints by Eugen417
 

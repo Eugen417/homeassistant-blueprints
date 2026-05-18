@@ -6,15 +6,17 @@ on:
       - main
       - master
     paths:
-      - 'ha-blueprints/loggia/**.yaml'
+      - '**.yaml'
+      - '**.yml'
   pull_request:
     branches:
       - main
       - master
     paths:
-      - 'ha-blueprints/loggia/**.yaml'
+      - '**.yaml'
+      - '**.yml'
 
-# Добавляем вот этот блок, чтобы успокоить GitHub:
+# Успокаиваем GitHub и переходим на новый Node.js
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

@@ -55,7 +55,7 @@ jobs:
           echo "default_config:" > fake_config/configuration.yaml
 
       - name: Проверка конфигурации через HA CLI
-        uses: frenck/action-homeassistant@v1
+        uses: frenck/action-home-assistant@v1  # <-- Добавили дефис тут!
         with:
           path: "fake_config"
           version: "latest"

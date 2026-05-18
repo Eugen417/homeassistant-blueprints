@@ -2,6 +2,7 @@ blueprint:
   name: 📄 Запись коммунальных расходов в Google Sheets + Telegram (FIXED_v1.2)
   description: 'Ежемесячно (в выбранный день) записывает показания счетчиков ХВС, ГВС, Электроэнергии, Газа и Тепла за **предыдущий месяц** в Google Sheets и отправляет уведомление в Telegram. Запуск всегда происходит в 00:00:01.'
   domain: automation
+  
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/data/kommunalnye_schetchiki_google_sheets.yaml
   
   input:

@@ -59,4 +59,4 @@ jobs:
         continue-on-error: false
         with:
           path: "fake_config"
-          version: "2026.5.4"
+          version: "stable"

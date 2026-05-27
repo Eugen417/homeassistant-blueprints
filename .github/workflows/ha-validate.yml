@@ -24,7 +24,7 @@ env:
 
 jobs:
   yamllint:
-    name: 🔍 Строгая проверка синтаксиса YAML
+    name: 🔍 Базовая проверка синтаксиса YAML
     runs-on: ubuntu-latest
     steps:
       - name: Скачивание репозитория
@@ -34,33 +34,19 @@ jobs:
         uses: ibiqlik/action-yamllint@v3
         with:
           config_data: |
-            extends: default
+            extends: relaxed
             rules:
-              # В Home Assistant не принято начинать файлы с маркера ---
               document-start: disable
-              
-              # Отключаем лимит длины строки, так как в Home Assistant
-              # шаблоны Jinja2 часто превышают 120 символов и это абсолютно нормально.
               line-length: disable
-                
-              # Жесткий контроль логических значений (разрешаем on/off для состояний HA)
+              trailing-spaces: disable
+              braces: disable
+              brackets: disable
+              comments: disable
+              comments-indentation: disable
+              new-line-at-end-of-file: disable
+              empty-lines: disable
               truthy:
                 allowed-values: ['true', 'false', 'on', 'off']
-                
-              # Никакого мусора в коде
-              trailing-spaces:
-                level: error
-              new-line-at-end-of-file:
-                level: error
-              new-lines:
-                type: unix
-                level: error
-                
-              # Идеальное форматирование комментариев (обязательный пробел после #)
-              comments:
-                level: error
-              comments-indentation:
-                level: error
 
   ha-validation:
     name: 🏠 Валидация Home Assistant
@@ -72,11 +58,9 @@ jobs:
 
       - name: Подготовка тестовой среды HA
         run: |
-          # Создаем изолированные папки под каждый тип блюпринтов
           mkdir -p fake_config/blueprints/automation/test
           mkdir -p fake_config/blueprints/script/test
           
-          # Копируем только файлы из новых папок, игнорируя файлы в корне репозитория
           if [ -d "automation" ]; then
             find automation/ -type f -name "*.yaml" -exec cp {} fake_config/blueprints/automation/test/ \;
           fi

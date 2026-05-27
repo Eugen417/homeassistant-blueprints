@@ -6,7 +6,7 @@ blueprint:
     или Add-on.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/system/restart_integration_if_device_state_unknown.yaml
-  
+
   input:
     entities_to_monitor:
       name: Сущности для мониторинга (минимум 1)
@@ -55,7 +55,7 @@ action:
       monitor_entities: !input entities_to_monitor
       target_id: !input target_id
       target_type: !input target_type
-      
+
       # ИСПРАВЛЕНИЕ #1: Использование namespace для корректного сбора списка внутри цикла.
       offline_entities_processed: >
         {% set ns = namespace(unavailable_ids=[]) %}
@@ -67,7 +67,7 @@ action:
             {% set ns.unavailable_ids = ns.unavailable_ids + [entity_id] %}
           {% endif %}
         {% endfor %}
-        {{ ns.unavailable_ids }} # Возвращаем чистый список ID
+        {{ ns.unavailable_ids }}  # Возвращаем чистый список ID
 
       # ИСПРАВЛЕНИЕ #2: Создаем чистую строку для уведомления.
       unavailable_entities_string: "{{ offline_entities_processed | join(', ') }}"
@@ -90,7 +90,7 @@ action:
                   - service: homeassistant.reload_config_entry 
                     data:
                       entry_id: "{{ target_id }}" 
-              
+
               # ВАРИАНТ 2: ПЕРЕЗАПУСК ADD-ON
               - conditions:
                   - condition: template
@@ -106,8 +106,9 @@ action:
             data:
               title: "Автоматический перезапуск Home Assistant"
               message: >
-                **{{ target_type | upper }}** с ID **{{ target_id }}** был(а) перезагружен(а), так как следующие сущности стали недоступны ({{ now().strftime('%H:%M:%S') }}): 
+                **{{ target_type | upper }}** с ID **{{ target_id }}** был(а) перезагружен(а),
+                так как следующие сущности стали недоступны ({{ now().strftime('%H:%M:%S') }}):
                 **{{ unavailable_entities_string }}**.
-    
+
     default: []
 mode: single

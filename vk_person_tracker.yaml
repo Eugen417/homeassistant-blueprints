@@ -35,15 +35,21 @@ blueprint:
           multiple: false
     message_home:
       name: "🏡 Фраза: Пришел домой"
-      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
+      description: >-
+        Поддерживает HTML теги (например, <b>...</b>).
+        Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "🏡 <b>{name}</b> вернулся(ась) домой! 👋"
     message_zone:
       name: "📍 Фраза: Прибыл в зону"
-      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
+      description: >-
+        Поддерживает HTML теги (например, <b>...</b>).
+        Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "📍 <b>{name}</b> прибыл(а) в: <b>{zone}</b>"
     message_away:
       name: "🚶 Фраза: В пути"
-      description: Поддерживает HTML теги (например, <b>...</b>). Обязательно используйте кавычки, если внутри есть двоеточие!
+      description: >-
+        Поддерживает HTML теги (например, <b>...</b>).
+        Обязательно используйте кавычки, если внутри есть двоеточие!
       default: "🚶 <b>{name}</b> в пути (покинул <i>{zone}</i>)."
 
 mode: parallel
@@ -121,13 +127,17 @@ action:
                       sequence:
                         - if:
                             - condition: template
-                              value_template: "{{ state_attr(repeat.item, 'latitude') is not none }}"
+                              value_template: >-
+                                {{ state_attr(repeat.item, 'latitude') is not none }}
                           then:
                             - action: vk_notify.send_message
                               data:
                                 title: "📍 Локация: {{ state_attr(repeat.item, 'friendly_name') }}"
                                 entity_id: "{{ vk_notifications_id }}"
-                                message: "Статус: <b>{{ 'Дома' if states(repeat.item) == 'home' else ('В пути' if states(repeat.item) == 'not_home' else states(repeat.item)) }}</b>"
+                                message: >-
+                                  Статус: <b>{{ 'Дома' if states(repeat.item) == 'home' 
+                                  else ('В пути' if states(repeat.item) == 'not_home' 
+                                  else states(repeat.item)) }}</b>
                                 lat: "{{ state_attr(repeat.item, 'latitude') }}"
                                 long: "{{ state_attr(repeat.item, 'longitude') }}"
                                 parse_mode: html
@@ -142,7 +152,9 @@ action:
                     data:
                       title: "<b>📍 Запрос местоположения</b>"
                       entity_id: "{{ vk_notifications_id }}"
-                      message: "🔎 <b>{{ real_name }}</b>, <b>{{ state_attr(target, 'friendly_name') }}</b> сейчас находится здесь:"
+                      message: >-
+                        🔎 <b>{{ real_name }}</b>, <b>{{ state_attr(target, 'friendly_name') }}</b> 
+                        сейчас находится здесь:
                       lat: "{{ state_attr(target, 'latitude') }}"
                       long: "{{ state_attr(target, 'longitude') }}"
                       parse_mode: html
@@ -175,9 +187,12 @@ action:
                       entity_id: "{{ vk_notifications_id }}"
                       message: >-
                         {% if to_state == 'not_home' %}
-                          {{ phrase_away | replace('{name}', person_name) | replace('{zone}', 'Дом' if trigger.from_state.state == 'home' else trigger.from_state.state) }}
+                          {{ phrase_away | replace('{name}', person_name) 
+                             | replace('{zone}', 'Дом' if trigger.from_state.state == 'home' 
+                             else trigger.from_state.state) }}
                         {% else %}
-                          {{ phrase_zone | replace('{name}', person_name) | replace('{zone}', to_state) }}
+                          {{ phrase_zone | replace('{name}', person_name) 
+                             | replace('{zone}', to_state) }}
                         {% endif %}
                       parse_mode: html
                       keyboard:
@@ -190,11 +205,31 @@ action:
                               {% set fname = state_attr(p_id, 'friendly_name') %}
                               {% set slug = p_id.split('.')[1] %}
                               {% if p_id == trigger.entity_id %}
-                                {% set btn = {"action": {"type": "callback", "label": "📍 Место: " ~ fname, "payload": {"action": "where_person", "person": slug}}, "color": "primary"} %}
+                                {% set btn = {
+                                  "action": {
+                                    "type": "callback", 
+                                    "label": "📍 Место: " ~ fname, 
+                                    "payload": {"action": "where_person", "person": slug}
+                                  }, 
+                                  "color": "primary"
+                                } %}
                               {% else %}
-                                {% set btn = {"action": {"type": "callback", "label": "Где " ~ fname ~ "?", "payload": {"action": "where_person", "person": slug}}} %}
+                                {% set btn = {
+                                  "action": {
+                                    "type": "callback", 
+                                    "label": "Где " ~ fname ~ "?", 
+                                    "payload": {"action": "where_person", "person": slug}
+                                  }
+                                } %}
                               {% endif %}
                               {% set ns.buttons = ns.buttons + [[btn]] %}
                             {% endif %}
                           {% endfor %}
-                          {{ ns.buttons + [[{"action": {"type": "callback", "label": "🌍 Где все?", "payload": {"action": "where_all"}}}]] }}
+                          {% set all_btn = {
+                            "action": {
+                              "type": "callback", 
+                              "label": "🌍 Где все?", 
+                              "payload": {"action": "where_all"}
+                            }
+                          } %}
+                          {{ ns.buttons + [[all_btn]] }}

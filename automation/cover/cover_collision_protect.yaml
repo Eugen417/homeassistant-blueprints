@@ -1,18 +1,19 @@
 blueprint:
   name: Защита штор и жалюзи от повреждений (V2.1)
   description: >-
-    Автоматизация для предотвращения коллизий между вертикальными жалюзи и шторами. 
-    
+    Автоматизация для предотвращения коллизий между вертикальными жалюзи и шторами.
+
     ВАЖНО: Убедитесь, что в настройках вашего шлюза (Zigbee2MQTT, ZHA и др.) для всех приводов:
     1. Включено отображение позиции в процентах (0-100%).
     2. Соблюден стандарт Home Assistant: 100% — ПОЛНОСТЬЮ ОТКРЫТО, 0% — ПОЛНОСТЬЮ ЗАКРЫТО.
     Если у вас 100% это закрыто — включите инверсию (Invert) в настройках устройства в Z2M.
-    
+
     Принцип работы:
     1. При открытии штор — сначала открываются жалюзи (до >98%).
     2. При закрытии жалюзи — сначала закрываются шторы (до <2%).
   domain: automation
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/cover/cover_collision_protect.yaml
+  source_url: "https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/\
+    automation/cover/cover_collision_protect.yaml"
   input:
     right_curtain_cover:
       name: Привод правой шторы
@@ -130,14 +131,18 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(-1) != -1 and state_attr(right_curtain, 'current_position') | int(-1) <= 1 }}"
+                    value_template: >-
+                      {{ state_attr(right_curtain, 'current_position') | int(-1) != -1 and 
+                         state_attr(right_curtain, 'current_position') | int(-1) <= 1 }}
                 sequence:
                   - service: cover.close_cover
                     target:
                       entity_id: !input right_blinds_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(right_curtain, 'current_position') | int(-1) > 1 or state_attr(right_curtain, 'current_position') == none }}"
+                    value_template: >-
+                      {{ state_attr(right_curtain, 'current_position') | int(-1) > 1 or 
+                         state_attr(right_curtain, 'current_position') == none }}
                 sequence:
                   - service: cover.stop_cover
                     target:
@@ -162,14 +167,18 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(-1) != -1 and state_attr(left_curtain, 'current_position') | int(-1) <= 1 }}"
+                    value_template: >-
+                      {{ state_attr(left_curtain, 'current_position') | int(-1) != -1 and 
+                         state_attr(left_curtain, 'current_position') | int(-1) <= 1 }}
                 sequence:
                   - service: cover.close_cover
                     target:
                       entity_id: !input left_blinds_cover
               - conditions:
                   - condition: template
-                    value_template: "{{ state_attr(left_curtain, 'current_position') | int(-1) > 1 or state_attr(left_curtain, 'current_position') == none }}"
+                    value_template: >-
+                      {{ state_attr(left_curtain, 'current_position') | int(-1) > 1 or 
+                         state_attr(left_curtain, 'current_position') == none }}
                 sequence:
                   - service: cover.stop_cover
                     target:

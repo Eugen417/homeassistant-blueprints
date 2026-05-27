@@ -24,7 +24,7 @@ env:
 
 jobs:
   yamllint:
-    name: 🧹 Проверка синтаксиса YAML
+    name: 🔍 Строгая проверка синтаксиса YAML
     runs-on: ubuntu-latest
     steps:
       - name: Скачивание репозитория
@@ -36,15 +36,32 @@ jobs:
           config_data: |
             extends: default
             rules:
-              line-length: disable
+              # В Home Assistant не принято начинать файлы с маркера ---
               document-start: disable
-              truthy: disable
-              trailing-spaces: disable
-              new-line-at-end-of-file: disable
-              braces: disable
-              brackets: disable
-              comments: disable
-              comments-indentation: disable
+              
+              # Педантичный контроль длины, но с запасом для Jinja2 шаблонов
+              line-length:
+                max: 120
+                level: error
+                
+              # Жесткий контроль логических значений (разрешаем on/off для состояний HA)
+              truthy:
+                allowed-values: ['true', 'false', 'on', 'off']
+                
+              # Никакого мусора в коде
+              trailing-spaces:
+                level: error
+              new-line-at-end-of-file:
+                level: error
+              new-lines:
+                type: unix
+                level: error
+                
+              # Идеальное форматирование комментариев (обязательный пробел после #)
+              comments:
+                level: error
+              comments-indentation:
+                level: error
 
   ha-validation:
     name: 🏠 Валидация Home Assistant

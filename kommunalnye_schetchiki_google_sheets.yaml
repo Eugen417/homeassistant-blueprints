@@ -1,13 +1,17 @@
 blueprint:
   name: 📄 Запись коммунальных расходов в Google Sheets + Telegram (FIXED_v1.2)
-  description: 'Ежемесячно (в выбранный день) записывает показания счетчиков ХВС, ГВС, Электроэнергии, Газа и Тепла за **предыдущий месяц** в Google Sheets и отправляет уведомление в Telegram. Запуск всегда происходит в 00:00:01.'
+  description: >-
+    Ежемесячно (в выбранный день) записывает показания счетчиков ХВС, ГВС, 
+    Электроэнергии, Газа и Тепла за **предыдущий месяц** в Google Sheets 
+    и отправляет уведомление в Telegram. Запуск всегда происходит в 00:00:01.
   domain: automation
-  
-  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/data/kommunalnye_schetchiki_google_sheets.yaml
-  
+
+  source_url: "https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/\
+    automation/data/kommunalnye_schetchiki_google_sheets.yaml"
+
   input:
     # 1. СЕНСОРЫ СЧЕТЧИКОВ И ИХ НОМЕРА
-    
+
     sensor_hvs_1:
       name: 💧 ХВС 1 (Сенсор)
       description: 'Выберите сенсор счетчика ХВС 1. Оставьте пустым, если не нужен.'
@@ -137,7 +141,9 @@ blueprint:
     # 4. НАСТРОЙКИ ЗАПУСКА
     execution_day:
       name: 📅 День месяца для запуска
-      description: 'Выберите день месяца (1-31), когда будет выполняться запись показаний. Если в месяце нет такого дня (например, 31 февраля), запуск произойдет в последний день месяца.'
+      description: >-
+        Выберите день месяца (1-31), когда будет выполняться запись показаний.
+        Если в месяце нет такого дня, запуск произойдет в последний день месяца.
       default: 1
       selector:
         number:
@@ -154,13 +160,13 @@ blueprint:
           options: []
           multiple: false
           custom_value: true
-          
+
     google_sheets_worksheet:
       name: 📝 Имя листа в таблице
       description: 'Точное имя листа/вкладки (например, "Учет коммунальных расходов").'
       selector:
         text:
-            
+
     # 3. TELEGRAM (Необязательно)
     telegram_notify_target:
       name: 💬 Целевое уведомление Telegram (Необязательно)
@@ -170,7 +176,7 @@ blueprint:
         target:
           entity:
             - domain: notify
-            
+
     sheets_link:
       name: 🔗 Ссылка на Google Sheets (Необязательно)
       description: 'URL-адрес вашей таблицы Google Sheets для включения в сообщение Telegram.'
@@ -185,7 +191,7 @@ blueprint:
 # ВАЖНО: Объявляем переменные inputs здесь, чтобы они были видны в condition
 variables:
   input_execution_day: !input execution_day
-  
+
   input_sensor_hvs_1: !input sensor_hvs_1
   input_sensor_hvs_2: !input sensor_hvs_2
   input_sensor_gvs_1: !input sensor_gvs_1
@@ -195,7 +201,7 @@ variables:
   input_sensor_t3: !input sensor_t3
   input_sensor_gas: !input sensor_gas
   input_sensor_heat: !input sensor_heat
-  
+
   input_meter_number_hvs_1: !input meter_number_hvs_1
   input_meter_number_hvs_2: !input meter_number_hvs_2
   input_meter_number_gvs_1: !input meter_number_gvs_1
@@ -205,7 +211,7 @@ variables:
   input_meter_number_t3: !input meter_number_t3
   input_meter_number_gas: !input meter_number_gas
   input_meter_number_heat: !input meter_number_heat
-  
+
   input_google_sheets_config: !input google_sheets_config
   input_google_sheets_worksheet: !input google_sheets_worksheet
   input_telegram_target: !input telegram_notify_target
@@ -224,15 +230,16 @@ condition:
       {# Теперь input_execution_day доступна здесь, так как она объявлена в variables выше #}
       {% set chosen_day = input_execution_day | int(1) %}
       {% set current_day = now().day %}
-      
+
       {# Надежный способ найти последний день текущего месяца #}
       {# Берем 28 число текущего месяца, прибавляем 4 дня (попадаем в след. месяц), #}
       {# берем 1 число след месяца и вычитаем 1 день. #}
       {% set next_month_start = (now().replace(day=28) + timedelta(days=4)).replace(day=1) %}
       {% set last_day_of_month = (next_month_start - timedelta(days=1)).day %}
 
-      {{ current_day == chosen_day or (chosen_day > last_day_of_month and current_day == last_day_of_month) }}
-    
+      {{ current_day == chosen_day or 
+         (chosen_day > last_day_of_month and current_day == last_day_of_month) }}
+
 action:
   # 0. ОПРЕДЕЛЕНИЕ ПЕРЕМЕННЫХ ЗНАЧЕНИЙ (логика вычислений)
   - variables:
@@ -240,20 +247,20 @@ action:
       # ХВС
       hvs1: "{{ states(input_sensor_hvs_1) | float(0) if input_sensor_hvs_1 is not none else '' }}"
       hvs2: "{{ states(input_sensor_hvs_2) | float(0) if input_sensor_hvs_2 is not none else '' }}"
-      
+
       # ГВС
       gvs1: "{{ states(input_sensor_gvs_1) | float(0) if input_sensor_gvs_1 is not none else '' }}"
       gvs2: "{{ states(input_sensor_gvs_2) | float(0) if input_sensor_gvs_2 is not none else '' }}"
-      
+
       # Электричество
       t1: "{{ states(input_sensor_t1) | float(0) if input_sensor_t1 is not none else '' }}"
       t2: "{{ states(input_sensor_t2) | float(0) if input_sensor_t2 is not none else '' }}"
       t3: "{{ states(input_sensor_t3) | float(0) if input_sensor_t3 is not none else '' }}"
-      
+
       # Прочее
       gas: "{{ states(input_sensor_gas) | float(0) if input_sensor_gas is not none else '' }}"
       heat: "{{ states(input_sensor_heat) | float(0) if input_sensor_heat is not none else '' }}"
-      
+
       # Дата и время (Показания берутся за ПРЕДЫДУЩИЙ день)
       current_year: "{{ (now() - timedelta(days=1)).strftime('%Y') }}"
       current_day: "{{ (now() - timedelta(days=1)).strftime('%d') }}"
@@ -272,7 +279,7 @@ action:
         {% elif month_num == 10 %}Октябрь
         {% elif month_num == 11 %}Ноябрь
         {% else %}Декабрь{% endif %}
-      
+
       # БЛОК TELEGRAM CHAT ID
       telegram_chat_id_str: >-
         {% set target_entity_id = input_telegram_target.get('entity_id', ['']) | first | default('') %}
@@ -285,7 +292,7 @@ action:
           {% endif %}
         {% endif %}
         {{ final_id }}
-        
+
   # 1. ЗАПИСЬ В GOOGLE SHEETS
   - service: google_sheets.append_sheet
     data:
@@ -313,14 +320,14 @@ action:
           - service: telegram_bot.send_message
             metadata: {}
             data:
-              chat_id: "{{ telegram_chat_id_str }}" 
+              chat_id: "{{ telegram_chat_id_str }}"
               message: |
                 ✅ Коммунальные расходы записаны
-                
+
                 📄 Показания счетчиков отправлены в Google Sheets.
                 {{ current_day }} {{ current_month_name }} {{ current_year }}
                 Отправленные данные:
-                
+
                 💧 {{ input_meter_number_hvs_1 }}: {{ hvs1 or '---' }}
                 💧 {{ input_meter_number_hvs_2 }}: {{ hvs2 or '---' }}
                 🩸 {{ input_meter_number_gvs_1 }}: {{ gvs1 or '---' }}
@@ -334,5 +341,5 @@ action:
                 🔗 <a href="{{ input_sheets_link }}">Открыть таблицу расходов</a>
                 {% endif %}
               parse_mode: html
-        
+
 mode: single

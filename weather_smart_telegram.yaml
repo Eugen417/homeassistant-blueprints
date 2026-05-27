@@ -5,7 +5,7 @@ blueprint:
     Поддерживает Telegram, Max Notify и VK Notify (теперь с полной поддержкой HTML и кликабельных ссылок!).
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/weather/weather_smart_telegram.yaml
- 
+
   input:
     # --- ГЛАВНЫЕ НАСТРОЙКИ ---
     weather_entity:
@@ -14,7 +14,7 @@ blueprint:
       selector:
         entity:
           domain: weather
-          
+
     trigger_time:
       name: "Время отправки"
       default: "07:00:00"
@@ -79,7 +79,7 @@ blueprint:
     txt_hail:
       name: "Текст: Град"
       default: "Град 🌨"
-    
+
     # --- СОВЕТЫ ---
     txt_umbrella:
       name: "Совет: Взять зонт"
@@ -87,7 +87,7 @@ blueprint:
     txt_warm:
       name: "Совет: Одеться теплее"
       default: "🧣 <b>Одевайтесь теплее!</b>"
-    
+
     cold_threshold:
       name: "Порог сильного мороза (°C)"
       default: -15
@@ -96,7 +96,7 @@ blueprint:
           min: -50
           max: 0
           unit_of_measurement: "°C"
-    
+
     txt_freeze_alert:
       name: "Совет: Сильный мороз"
       default: "🧣 <b>На улице серьезный минус! Одевайтесь как капуста!</b>"
@@ -113,7 +113,7 @@ variables:
   vk_notify_target: !input vk_notify_target
   max_notify_target: !input max_notify_target
   map_link: !input map_url
- 
+
   # --- ЛОГИКА ИЗВЛЕЧЕНИЯ ID ---
   target_chat_ids: >-
     {% set selected_entities_raw = telegram_notify_target.entity_id | default([]) %}
@@ -146,7 +146,7 @@ variables:
   t_snow_rain: !input txt_snow_rain
   t_lightning: !input txt_lightning
   t_hail: !input txt_hail
- 
+
   adv_umbrella: !input txt_umbrella
   adv_warm: !input txt_warm
   adv_freeze: !input txt_freeze_alert
@@ -161,7 +161,9 @@ trigger:
 action:
   - if:
       - condition: template
-        value_template: "{{ (target_chat_ids | length == 0) and (vk_targets | length == 0) and (max_targets | length == 0) }}"
+        value_template: >-
+          {{ (target_chat_ids | length == 0) and (vk_targets | length == 0) and 
+             (max_targets | length == 0) }}
     then:
       - stop: "Не выбраны получатели ни для одной из платформ"
 
@@ -177,12 +179,15 @@ action:
       msg_title: >-
         {%- set forecast = daily_weather_data[weather_entity].forecast -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
-        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
+        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) 
+            | list | count > 0 -%}
         {%- if is_bad -%}
         🌨 Прогноз погоды
         {%- else -%}
         {%- set t = forecast[0].temperature -%}
-        {%- if t < limit_cold -%}🥶 Бррр, дубак!{%- elif t < 0 -%}❄️ Морозно{%- else -%}☀️ Хорошая погода{%- endif -%}
+        {%- if t < limit_cold -%}🥶 Бррр, дубак!
+        {%- elif t < 0 -%}❄️ Морозно
+        {%- else -%}☀️ Хорошая погода{%- endif -%}
         {%- endif -%}
 
       # --- ЕДИНАЯ ВЕРСИЯ HTML (TELEGRAM, MAX, VK) ---
@@ -194,8 +199,12 @@ action:
         {%- set t_max = temps | max -%}
         {%- set bad_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy', 'snowy', 'hail'] -%}
         {%- set wet_weather = ['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy'] -%}
-        {%- set mapper = {'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning, 'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail} -%}
-        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) | list | count > 0 -%}
+        {%- set mapper = {
+            'rainy': t_rain, 'pouring': t_pouring, 'lightning-rainy': t_lightning, 
+            'snowy-rainy': t_snow_rain, 'snowy': t_snow, 'hail': t_hail
+        } -%}
+        {%- set is_bad = forecast[:24] | selectattr('condition', 'in', bad_weather) 
+            | list | count > 0 -%}
         🌡 Сейчас: <b>{{ t_current }}°C</b> (Мин: {{ t_min }}°C, Макс: {{ t_max }}°C){{ '\n' }}
         {%- if is_bad %}
         {{ '\n' }}<b>Внимание, ожидаются осадки (24ч):</b>
@@ -210,7 +219,7 @@ action:
           {%- endif -%}
         {%- endfor -%}
         {%- if ns.current_block -%}{%- set ns.blocks = ns.blocks + [ns.current_block] -%}{%- endif -%}
-        
+
         {%- for block in ns.blocks -%}
         {%- set start = block[0] -%}
         {%- set end = block[-1] -%}
@@ -219,18 +228,25 @@ action:
         {%- set hour_day = as_timestamp(start.datetime) | timestamp_custom('%d') -%}
         {%- set day_text = ' (завтра)' if now_day != hour_day else '' -%}
         {%- if start == end -%}
-        {{ '\n' }}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}</b>{{ day_text }} — {{ c_name }} ({{ start.temperature }}°C)
+        {{ '\n' ~ '🕒 <b>' ~ (as_timestamp(start.datetime) | timestamp_custom('%H:%M')) ~ '</b>' ~
+           day_text ~ ' — ' ~ c_name ~ ' (' ~ start.temperature ~ '°C)' }}
         {%- else -%}
         {%- set end_time = as_timestamp(end.datetime) + 3600 -%}
-        {{ '\n' }}🕒 <b>{{ as_timestamp(start.datetime) | timestamp_custom('%H:%M') }}–{{ end_time | timestamp_custom('%H:%M') }}</b>{{ day_text }} — {{ c_name }} ({{ start.temperature }}°C)
+        {{ '\n' ~ '🕒 <b>' ~ (as_timestamp(start.datetime) | timestamp_custom('%H:%M')) ~ '–' ~
+           (end_time | timestamp_custom('%H:%M')) ~ '</b>' ~ day_text ~ ' — ' ~ 
+           c_name ~ ' (' ~ start.temperature ~ '°C)' }}
         {%- endif -%}
         {%- endfor -%}
 
-        {{ '\n\n' }}{%- set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) | list | count > 0 -%}
+        {{ '\n\n' }}
+        {%- set has_rain = forecast[:24] | selectattr('condition', 'in', wet_weather) 
+            | list | count > 0 -%}
         {%- if has_rain %}{{ adv_umbrella }}{% else %}{{ adv_warm }}{% endif %}
         {%- else %}
         {{ '\n' }}Доброе утро!
-        {{ '\n' }}Осадков не ожидается{% if t_current < 0 %}, но давайте проверим градусник.{% else %}.{% endif %}{{ '\n' }}
+        {{ '\n' }}Осадков не ожидается
+        {%- if t_current < 0 -%}, но давайте проверим градусник.
+        {%- else -%}.{%- endif -%}{{ '\n' }}
         {%- if t_current < limit_cold -%}
         {{ '\n' }}{{ adv_freeze }}
         {%- elif t_current < -5 -%}
@@ -245,7 +261,7 @@ action:
         {%- endif -%}
 
   # --- БЛОКИ ОТПРАВКИ ---
- 
+
   # 1. Telegram
   - if:
       - condition: template

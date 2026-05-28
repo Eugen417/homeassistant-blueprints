@@ -1,5 +1,5 @@
 blueprint:
-  name: "\U0001F4A7 Уведомление о протечке v16.7 (VK HTML + Max HTML + Telegram + Имена кранов)"
+  name: "\U0001F4A7 Уведомление о протечке v16.8 (VK HTML + Max HTML + Telegram + Имена кранов)"
   description: Устранены ошибки YAML (исправлен синтаксис PUSH mobile_app). Заменен устаревший параметр target на chat_id. Добавлена поддержка нативных служб max_notify.send_message и vk_notify.send_message с полноценным HTML-форматированием, заголовками и отключением упоминаний. Добавлен вывод конкретных названий перекрываемых кранов в текстовые и голосовые уведомления.
   domain: automation
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/security/new_waterleackdeteckt_tts_push_notifi.yaml

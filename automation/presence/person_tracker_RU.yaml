@@ -1,5 +1,5 @@
 blueprint:
-  name: "🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.6"
+  name: "🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.7"
   description: "Отслеживание прихода/ухода выбранных пользователей (person.XXX) с генерацией\nинтерактивной кнопки для запроса местоположения. **Все уведомления теперь\nполностью редактируются через настройки автоматизации.**\nЗаменен устаревший параметр target на chat_id для Telegram.\n\n✅ Поддержка одновременного срабатывания (`mode: parallel`) и запроса местоположения\n**всех** отслеживаемых пользователей (`/gde_vse`).\n\nТРЕБОВАНИЕ: Для Telegram-кнопок необходим `platform: polling` в конфигурации бота.\n\n---\n**ПРИМЕР КОНФИГУРАЦИИ TELEGRAM В configuration.yaml** 🤖\n---\ntelegram_bot:\n  - platform: polling\n    api_key: \"ВАШ_ТОКЕН_БОТА\"\n    parse_mode: html\n    allowed_chat_ids:\n      - -1234567890123\n      - 987654321\n    allowed_commands:\n      - /gde_vse\n"
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/presence/person_tracker_RU.yaml
   domain: automation

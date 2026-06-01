@@ -1,5 +1,5 @@
 blueprint:
-  name: "🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.8"
+  name: "🏠 Отслеживание пользователей с редактируемыми фразами и Telegram 📍 v1.9"
   description: |
     Отслеживание прихода/ухода выбранных пользователей (person.XXX) с генерацией
     интерактивной кнопки для запроса местоположения. **Все уведомления теперь
@@ -26,7 +26,7 @@ blueprint:
   source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/presence/person_tracker_RU.yaml
   domain: automation
   input:
-    # 1. СПИСОК ОТСЛЕЖИВАЕМЫХ PERSON (Идеальное название ключа)
+    # 1. СПИСОК ОТСЛЕЖИВАЕМЫХ PERSON
     tracked_persons:
       name: "📝 Список отслеживаемых пользователей (person.XXX) 🗺️"
       description: Выберите person-сущности для отслеживания.
@@ -35,14 +35,13 @@ blueprint:
           domain: person
           multiple: true
 
-    # 2. СЕРВИС УВЕДОМЛЕНИЙ TELEGRAM (Идеальное название ключа)
+    # 2. СЕРВИС УВЕДОМЛЕНИЙ TELEGRAM (Исправленный фильтр)
     telegram_notifications:
       name: "➤ Сервис уведомлений Telegram (notify.xxx) 🗺️"
-      description: Выберите сущность notify, созданную для Telegram-бота.
+      description: "Выберите сущность notify. ВАЖНО: имя сущности должно заканчиваться на ID чата (например, notify.telegram_1234567890)"
       selector:
         entity:
           domain: notify
-          integration: telegram_bot
 
     # --- НАСТРАИВАЕМЫЕ ФРАЗЫ ---
     message_left_home:

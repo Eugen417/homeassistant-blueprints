@@ -1,0 +1,47 @@
+blueprint:
+  name: Battery Notes - Батарея заменена
+  description: >
+    Автоматически устанавливать дату замены, когда уровень заряда батареи увеличивается.
+    
+    Оригинальный автор: [andrew-codechimp](https://github.com/andrew-codechimp)
+    Оригинальный блюпринт: [GitHub](https://github.com/andrew-codechimp/HA-Battery-Notes/blob/main/docs/blueprints/battery_notes_battery_replaced.yaml)
+    Перевод: Eugen417
+  author: andrew-codechimp
+  source_url: https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/devices/battery_notes_battery_replaced_ru.yaml
+  domain: automation
+  input:
+    additional_conditions:
+      name: Дополнительные условия
+      description: |
+        Дополнительные условия, которые вы хотите добавить в эту автоматизацию
+        (Например: Кто-то есть дома)
+      default: []
+      selector:
+        condition:
+    on_replaced_actions:
+      name: Действия при замене
+      description: |
+        Действия, которые нужно выполнить при замене батареи (само обновление даты замены в сенсоре происходит автоматически, его сюда добавлять не нужно).
+        Вы можете использовать любые данные из события с помощью переменных trigger.event.data.xxx
+      default: []
+      selector:
+        action:
+
+triggers:
+  - trigger: event
+    event_type: battery_notes_battery_increased
+
+conditions:
+  - alias: Пользовательские условия
+    condition: !input additional_conditions
+
+actions:
+  - action: battery_notes.set_battery_replaced
+    data:
+      device_id: "{{ trigger.event.data.device_id }}"
+      source_entity_id: "{{ trigger.event.data.source_entity_id }}"
+  - alias: "Выполнение пользовательских действий при замене"
+    choose: []
+    default: !input 'on_replaced_actions'
+
+mode: queued

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Уведомление Прогноз о метео + Карта v1.7"
+  name: "Уведомление Прогноз о метео + Карта v1.8"
   description: >
     Отправляет прогноз погоды и ссылку на карту осадков.
     Поддерживает Telegram, Max Notify и VK Notify (теперь с полной поддержкой HTML и кликабельных ссылок!).
@@ -292,9 +292,10 @@ action:
       - condition: template
         value_template: "{{ max_targets | length > 0 }}"
     then:
-      - action: notify.send_message
+      - action: max_notify.send_message
         target:
           entity_id: "{{ max_targets }}"
         data:
           title: "{{ msg_title }}"
           message: "{{ msg_text_html }}"
+          format: html

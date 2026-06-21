@@ -1,20 +1,12 @@
 blueprint:
-  name: Защита штор и жалюзи от повреждений (V2.1)
+  name: Защита штор и жалюзи от повреждений (V3.0)
   description: >-
-    Автоматизация для предотвращения коллизий между вертикальными жалюзи и шторами.
-
-    ВАЖНО: Убедитесь, что в настройках вашего шлюза (Zigbee2MQTT, ZHA и др.) для всех приводов:
-    1. Включено отображение позиции в процентах (0-100%).
-    2. Соблюден стандарт Home Assistant: 100% — ПОЛНОСТЬЮ ОТКРЫТО, 0% — ПОЛНОСТЬЮ ЗАКРЫТО.
-    Если у вас 100% это закрыто — включите инверсию (Invert) в настройках устройства в Z2M.
-
-    Принцип работы:
-    1. При открытии штор — сначала открываются жалюзи (до >98%).
-    2. При закрытии жалюзи — сначала закрываются шторы (до <2%).
+    Автоматизация для предотвращения коллизий, использующая аппаратные сенсоры состояния моторов (motor_state или running) вместо процентов позиции. 
+    Гарантирует, что следующий привод начнет движение только после полной физической остановки предыдущего.
   domain: automation
-  source_url: "https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/\
-    automation/cover/cover_collision_protect.yaml"
+  source_url: "https://raw.githubusercontent.com/Eugen417/homeassistant-blueprints/main/automation/cover/cover_collision_protect.yaml"
   input:
+    # --- ОСНОВНЫЕ ПРИВОДЫ ---
     right_curtain_cover:
       name: Привод правой шторы
       selector:
@@ -39,6 +31,52 @@ blueprint:
         entity:
           domain: cover
           device_class: blind
+          
+    # --- СЕНСОРЫ СОСТОЯНИЯ (motor_state или running) ---
+    right_curtain_sensor:
+      name: Сенсор работы ПРАВОЙ шторы
+      description: Сенсор, показывающий движение (motor_state или running).
+      selector:
+        entity:
+          domain:
+            - sensor
+            - binary_sensor
+    left_curtain_sensor:
+      name: Сенсор работы ЛЕВОЙ шторы
+      description: Сенсор, показывающий движение (motor_state или running).
+      selector:
+        entity:
+          domain:
+            - sensor
+            - binary_sensor
+    right_blinds_sensor:
+      name: Сенсор работы ПРАВЫХ жалюзи
+      description: Сенсор, показывающий движение (motor_state или running).
+      selector:
+        entity:
+          domain:
+            - sensor
+            - binary_sensor
+    left_blinds_sensor:
+      name: Сенсор работы ЛЕВЫХ жалюзи
+      description: Сенсор, показывающий движение (motor_state или running).
+      selector:
+        entity:
+          domain:
+            - sensor
+            - binary_sensor
+
+    # --- НАСТРОЙКИ СТАТУСА ---
+    stopped_state:
+      name: Значение остановленного мотора
+      description: >-
+        Что передает сенсор, когда мотор стоит? 
+        Если используете 'motor_state', напишите: stopped
+        Если используете 'running', напишите: false (или off)
+      default: "stopped"
+
+mode: parallel
+max: 10
 
 trigger:
   - platform: state
@@ -58,8 +96,11 @@ action:
       left_curtain: !input left_curtain_cover
       right_blinds: !input right_blinds_cover
       left_blinds: !input left_blinds_cover
+      stop_state_val: !input stopped_state
   - choose:
+      # ==========================================
       # --- ПРАВАЯ СТОРОНА: Открытие шторы ---
+      # ==========================================
       - conditions:
           - condition: template
             value_template: "{{ trigger.entity_id == right_curtain }}"
@@ -82,16 +123,20 @@ action:
                   - service: cover.open_cover
                     target:
                       entity_id: !input right_blinds_cover
+                  # Ждем аппаратной остановки мотора жалюзи
                   - wait_for_trigger:
-                      - platform: numeric_state
-                        entity_id: !input right_blinds_cover
-                        attribute: current_position
-                        above: 98
+                      - platform: state
+                        entity_id: !input right_blinds_sensor
+                        to: !input stopped_state
+                    timeout: "00:00:20"
+                    continue_on_timeout: true
                   - service: cover.open_cover
                     target:
                       entity_id: !input right_curtain_cover
 
+      # ==========================================
       # --- ЛЕВАЯ СТОРОНА: Открытие шторы ---
+      # ==========================================
       - conditions:
           - condition: template
             value_template: "{{ trigger.entity_id == left_curtain }}"
@@ -114,16 +159,20 @@ action:
                   - service: cover.open_cover
                     target:
                       entity_id: !input left_blinds_cover
+                  # Ждем аппаратной остановки мотора жалюзи
                   - wait_for_trigger:
-                      - platform: numeric_state
-                        entity_id: !input left_blinds_cover
-                        attribute: current_position
-                        above: 98
+                      - platform: state
+                        entity_id: !input left_blinds_sensor
+                        to: !input stopped_state
+                    timeout: "00:00:20"
+                    continue_on_timeout: true
                   - service: cover.open_cover
                     target:
                       entity_id: !input left_curtain_cover
 
+      # ==========================================
       # --- ПРАВАЯ СТОРОНА: Закрытие жалюзи ---
+      # ==========================================
       - conditions:
           - condition: template
             value_template: "{{ trigger.entity_id == right_blinds }}"
@@ -150,16 +199,20 @@ action:
                   - service: cover.close_cover
                     target:
                       entity_id: !input right_curtain_cover
+                  # Ждем аппаратной остановки мотора шторы
                   - wait_for_trigger:
-                      - platform: numeric_state
-                        entity_id: !input right_curtain_cover
-                        attribute: current_position
-                        below: 2
+                      - platform: state
+                        entity_id: !input right_curtain_sensor
+                        to: !input stopped_state
+                    timeout: "00:00:20"
+                    continue_on_timeout: true
                   - service: cover.close_cover
                     target:
                       entity_id: !input right_blinds_cover
 
+      # ==========================================
       # --- ЛЕВАЯ СТОРОНА: Закрытие жалюзи ---
+      # ==========================================
       - conditions:
           - condition: template
             value_template: "{{ trigger.entity_id == left_blinds }}"
@@ -186,12 +239,13 @@ action:
                   - service: cover.close_cover
                     target:
                       entity_id: !input left_curtain_cover
+                  # Ждем аппаратной остановки мотора шторы
                   - wait_for_trigger:
-                      - platform: numeric_state
-                        entity_id: !input left_curtain_cover
-                        attribute: current_position
-                        below: 2
+                      - platform: state
+                        entity_id: !input left_curtain_sensor
+                        to: !input stopped_state
+                    timeout: "00:00:20"
+                    continue_on_timeout: true
                   - service: cover.close_cover
                     target:
                       entity_id: !input left_blinds_cover
-mode: single

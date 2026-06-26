@@ -76,8 +76,8 @@ action:
             value_template: "{{ trigger.to_state.context.user_id is not none }}"
         sequence:
           # Устанавливает флаг в ON, если свет включен, и в OFF, если выключен.
-          - service: "input_boolean.turn_{| trigger.to_state.state |}"
-            data:
+          - action: "input_boolean.turn_{{ trigger.to_state.state }}"
+            target:
               entity_id: !input manual_lock_helper
 
       # =======================================================
@@ -94,8 +94,8 @@ action:
             entity_id: !input manual_lock_helper
             state: 'off'
         sequence:
-          - service: homeassistant.turn_on
-            data:
+          - action: homeassistant.turn_on
+            target:
               entity_id: !input control_entity
 
       # =======================================================
@@ -131,8 +131,8 @@ action:
                     entity_id: !input manual_lock_helper
                     state: 'off'
                 sequence:
-                  - service: homeassistant.turn_off
-                    data:
+                  - action: homeassistant.turn_off
+                    target:
                       entity_id: !input control_entity
 
     default: []
